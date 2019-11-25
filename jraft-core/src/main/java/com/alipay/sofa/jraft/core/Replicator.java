@@ -760,6 +760,7 @@ public class Replicator implements ThreadId.OnError {
 
     boolean prepareEntry(final long nextSendingIndex, final int offset, final RaftOutter.EntryMeta.Builder emb,
                          final RecyclableByteBufferList dateBuffer) {
+        //512 * 1024
         if (dateBuffer.getCapacity() >= this.raftOptions.getMaxBodySize()) {
             return false;
         }

@@ -702,10 +702,12 @@ public class LogManagerImpl implements LogManager {
         if (!this.logsInMemory.isEmpty()) {
             final long firstIndex = this.logsInMemory.peekFirst().getId().getIndex();
             final long lastIndex = this.logsInMemory.peekLast().getId().getIndex();
+            //根据最后一个日志和第一次日志校验一下日志的容量对不对
             if (lastIndex - firstIndex + 1 != this.logsInMemory.size()) {
                 throw new IllegalStateException(String.format("lastIndex=%d,firstIndex=%d,logsInMemory=[%s]",
                     lastIndex, firstIndex, descLogsInMemory()));
             }
+            //如果index在开始和结束范围之内，那么就返回LogEntry
             if (index >= firstIndex && index <= lastIndex) {
                 entry = this.logsInMemory.get((int) (index - firstIndex));
             }
