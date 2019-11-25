@@ -54,7 +54,7 @@ public class CounterStateMachine extends StateMachineAdapter {
      */
     private final AtomicLong    value      = new AtomicLong(0);
     /**
-     * Leader term
+     * Leader term 表示Leader的任期
      */
     private final AtomicLong    leaderTerm = new AtomicLong(-1);
 
@@ -71,9 +71,11 @@ public class CounterStateMachine extends StateMachineAdapter {
 
     @Override
     public void onApply(final Iterator iter) {
+        //获取processor中封装的数据
         while (iter.hasNext()) {
             long delta = 0;
 
+            //用于封装请求数据和回调结果
             IncrementAndAddClosure closure = null;
             if (iter.done() != null) {
                 // This task is applied by this node, get value from closure to avoid additional parsing.
@@ -84,14 +86,17 @@ public class CounterStateMachine extends StateMachineAdapter {
                 final ByteBuffer data = iter.getData();
                 try {
                     final IncrementAndGetRequest request = SerializerManager.getSerializer(SerializerManager.Hessian2)
-                        .deserialize(data.array(), IncrementAndGetRequest.class.getName());
+                            .deserialize(data.array(), IncrementAndGetRequest.class.getName());
                     delta = request.getDelta();
                 } catch (final CodecException e) {
                     LOG.error("Fail to decode IncrementAndGetRequest", e);
                 }
             }
+            //获取当前值
             final long prev = this.value.get();
+            //将当前值加上delta
             final long updated = value.addAndGet(delta);
+            //设置响应，并调用run方法回写响应方法
             if (closure != null) {
                 closure.getResponse().setValue(updated);
                 closure.getResponse().setSuccess(true);

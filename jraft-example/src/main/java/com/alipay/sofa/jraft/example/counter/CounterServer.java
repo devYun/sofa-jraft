@@ -105,12 +105,19 @@ public class CounterServer {
             System.out
                 .println("Useage : java com.alipay.sofa.jraft.example.counter.CounterServer {dataPath} {groupId} {serverId} {initConf}");
             System.out
-                .println("Example: java com.alipay.sofa.jraft.example.counter.CounterServer /tmp/server1 counter 127.0.0.1:8081 127.0.0.1:8081,127.0.0.1:8082,127.0.0.1:8083");
+                .println("Example: java com.alipay.sofa.jraft.example.counter.CounterServer " +
+                        "/tmp/server1 " +
+                        "counter " +
+                        "127.0.0.1:8081 127.0.0.1:8081,127.0.0.1:8082,127.0.0.1:8083");
             System.exit(1);
         }
+        //日志存储的路径
         final String dataPath = args[0];
+        //SOFAJRaft集群的名字
         final String groupId = args[1];
+        //当前节点的ip和端口
         final String serverIdStr = args[2];
+        //集群节点的ip和端口
         final String initConfStr = args[3];
 
         final NodeOptions nodeOptions = new NodeOptions();
@@ -127,6 +134,7 @@ public class CounterServer {
             throw new IllegalArgumentException("Fail to parse serverId:" + serverIdStr);
         }
         final Configuration initConf = new Configuration();
+        //将raft分组加入到Configuration的peers数组中
         if (!initConf.parse(initConfStr)) {
             throw new IllegalArgumentException("Fail to parse initConf:" + initConfStr);
         }

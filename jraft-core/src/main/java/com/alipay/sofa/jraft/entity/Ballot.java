@@ -65,21 +65,22 @@ public class Ballot {
         this.oldPeers.clear();
         quorum = oldQuorum = 0;
         int index = 0;
+        //初始化新的节点
         if (conf != null) {
             for (PeerId peer : conf) {
                 this.peers.add(new UnfoundPeerId(peer, index++, false));
             }
         }
-
+        //设置需要多少票数才能成为leader
         this.quorum = this.peers.size() / 2 + 1;
         if (oldConf == null) {
             return true;
         }
         index = 0;
+        //设置老的节点
         for (PeerId peer : oldConf) {
             this.oldPeers.add(new UnfoundPeerId(peer, index++, false));
         }
-
         this.oldQuorum = this.oldPeers.size() / 2 + 1;
         return true;
     }

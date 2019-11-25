@@ -64,6 +64,8 @@ public class GetLeaderRequestProcessor extends BaseCliRequestProcessor<GetLeader
     public Message processRequest(GetLeaderRequest request, RpcRequestClosure done) {
         List<Node> nodes = new ArrayList<>();
         String groupId = getGroupId(request);
+        //如果请求是指定某个PeerId
+        //那么则则去集群里找到指定Peer所对应的node
         if (request.hasPeerId()) {
             String peerIdStr = getPeerId(request);
             PeerId peer = new PeerId();
@@ -77,11 +79,13 @@ public class GetLeaderRequestProcessor extends BaseCliRequestProcessor<GetLeader
                 return RpcResponseFactory.newResponse(RaftError.EINVAL, "Fail to parse peer id %", peerIdStr);
             }
         } else {
+            //获取集群所有的节点
             nodes = NodeManager.getInstance().getNodesByGroupId(groupId);
         }
         if (nodes == null || nodes.isEmpty()) {
             return RpcResponseFactory.newResponse(RaftError.ENOENT, "No nodes in group %s", groupId);
         }
+        //遍历集群node，获取leaderId
         for (Node node : nodes) {
             PeerId leader = node.getLeaderId();
             if (leader != null && !leader.isEmpty()) {

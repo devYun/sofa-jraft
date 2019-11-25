@@ -40,7 +40,9 @@ public abstract class RepeatedTimer implements Describer {
     public static final Logger LOG  = LoggerFactory.getLogger(RepeatedTimer.class);
 
     private final Lock         lock = new ReentrantLock();
+    //timer是HashedWheelTimer
     private final Timer        timer;
+    //实例是HashedWheelTimeout
     private Timeout            timeout;
     private boolean            stopped;
     private volatile boolean   running;
@@ -54,6 +56,7 @@ public abstract class RepeatedTimer implements Describer {
     }
 
     public RepeatedTimer(String name, int timeoutMs) {
+        //name代表RepeatedTimer实例的种类，timeoutMs是超时时间
         this(name, timeoutMs, new HashedWheelTimer(new NamedThreadFactory(name, true), 1, TimeUnit.MILLISECONDS, 2048));
     }
 
@@ -81,13 +84,16 @@ public abstract class RepeatedTimer implements Describer {
     }
 
     public void run() {
+        //加锁
         this.lock.lock();
         try {
+            //表示RepeatedTimer已经被调用过
             this.invoking = true;
         } finally {
             this.lock.unlock();
         }
         try {
+            //然后会调用RepeatedTimer实例实现的方法
             onTrigger();
         } catch (final Throwable t) {
             LOG.error("Run timer failed.", t);
@@ -96,6 +102,7 @@ public abstract class RepeatedTimer implements Describer {
         this.lock.lock();
         try {
             this.invoking = false;
+            //如果调用了stop方法，那么将不会继续调用schedule方法
             if (this.stopped) {
                 this.running = false;
                 invokeDestroyed = this.destroyed;
@@ -137,15 +144,20 @@ public abstract class RepeatedTimer implements Describer {
      * Start the timer.
      */
     public void start() {
+        //加锁，只能一个线程调用这个方法
         this.lock.lock();
         try {
+            //destroyed默认是false
             if (this.destroyed) {
                 return;
             }
+            //stopped在构造器中初始化为ture
             if (!this.stopped) {
                 return;
             }
+            //启动完一次后下次就无法再次往下继续
             this.stopped = false;
+            //running默认为false
             if (this.running) {
                 return;
             }

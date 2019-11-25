@@ -85,6 +85,7 @@ public class RegionEngine implements Lifecycle<RegionEngineOptions> {
             return true;
         }
         this.regionOpts = Requires.requireNonNull(opts, "opts");
+        //实例化状态机
         this.fsm = new KVStoreStateMachine(this.region, this.storeEngine);
 
         // node options
@@ -92,13 +93,16 @@ public class RegionEngine implements Lifecycle<RegionEngineOptions> {
         if (nodeOpts == null) {
             nodeOpts = new NodeOptions();
         }
+        //如果度量间隔时间大于零，那么开启度量
         final long metricsReportPeriod = opts.getMetricsReportPeriod();
         if (metricsReportPeriod > 0) {
             // metricsReportPeriod > 0 means enable metrics
             nodeOpts.setEnableMetrics(true);
         }
+        //初始化集群配置
         nodeOpts.setInitialConf(new Configuration(JRaftHelper.toJRaftPeerIdList(this.region.getPeers())));
         nodeOpts.setFsm(this.fsm);
+        //初始化各种日志的路径
         final String raftDataPath = opts.getRaftDataPath();
         try {
             FileUtils.forceMkdir(new File(raftDataPath));
@@ -124,12 +128,16 @@ public class RegionEngine implements Lifecycle<RegionEngineOptions> {
         final PeerId serverId = new PeerId(serverAddress, 0);
         final RpcServer rpcServer = this.storeEngine.getRpcServer();
         this.raftGroupService = new RaftGroupService(opts.getRaftGroupId(), serverId, nodeOpts, rpcServer, true);
+        //初始化node节点
         this.node = this.raftGroupService.start(false);
         RouteTable.getInstance().updateConfiguration(this.raftGroupService.getGroupId(), nodeOpts.getInitialConf());
         if (this.node != null) {
             final RawKVStore rawKVStore = this.storeEngine.getRawKVStore();
             final Executor readIndexExecutor = this.storeEngine.getReadIndexExecutor();
+            //RaftRawKVStore 是 RheaKV 基于 Raft 复制状态机 KVStoreStateMachine 的 RawKVStore 接口 KV 存储实现
+            //RheaKV 的 Raft 入口，从这里开始 Raft 流程
             this.raftRawKVStore = new RaftRawKVStore(this.node, rawKVStore, readIndexExecutor);
+            //拦截请求做指标度量
             this.metricsRawKVStore = new MetricsRawKVStore(this.region.getId(), this.raftRawKVStore);
             // metrics config
             if (this.regionMetricsReporter == null && metricsReportPeriod > 0) {

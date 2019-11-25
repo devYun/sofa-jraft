@@ -16,11 +16,13 @@
  */
 package com.alipay.sofa.jraft.example.rheakv;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.alipay.sofa.jraft.rhea.client.DefaultRheaKVStore;
 import com.alipay.sofa.jraft.rhea.client.RheaKVStore;
 import com.alipay.sofa.jraft.rhea.options.PlacementDriverOptions;
+import com.alipay.sofa.jraft.rhea.options.RegionEngineOptions;
 import com.alipay.sofa.jraft.rhea.options.RegionRouteTableOptions;
 import com.alipay.sofa.jraft.rhea.options.RheaKVStoreOptions;
 import com.alipay.sofa.jraft.rhea.options.configured.MultiRegionRouteTableOptionsConfigured;
@@ -38,12 +40,17 @@ public class Client {
     public void init() {
         final List<RegionRouteTableOptions> regionRouteTableOptionsList = MultiRegionRouteTableOptionsConfigured
             .newConfigured() //
-            .withInitialServerList(-1L /* default id */, Configs.ALL_NODE_ADDRESSES) //
+            .withInitialServerList(1L /* default id */, Configs.ALL_NODE_ADDRESSES) //
+            .withInitialServerList(2L /* default id */, Configs.ALL_NODE_ADDRESSES) //
+            .withInitialServerList(3L /* default id */, Configs.ALL_NODE_ADDRESSES) //
+
             .config();
+
         final PlacementDriverOptions pdOpts = PlacementDriverOptionsConfigured.newConfigured() //
             .withFake(true) //
             .withRegionRouteTableOptionsList(regionRouteTableOptionsList) //
             .config();
+
         final RheaKVStoreOptions opts = RheaKVStoreOptionsConfigured.newConfigured() //
             .withClusterName(Configs.CLUSTER_NAME) //
             .withPlacementDriverOptions(pdOpts) //

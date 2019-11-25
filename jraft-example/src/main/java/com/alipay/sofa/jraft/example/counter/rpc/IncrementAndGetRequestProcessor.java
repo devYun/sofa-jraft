@@ -49,32 +49,39 @@ public class IncrementAndGetRequestProcessor extends AsyncUserProcessor<Incremen
     }
 
     @Override
-    public void handleRequest(final BizContext bizCtx, final AsyncContext asyncCtx, final IncrementAndGetRequest request) {
+    public void handleRequest(final BizContext bizCtx, final AsyncContext asyncCtx,
+                              final IncrementAndGetRequest request) {
+        //判断当前节点是否是leader
         if (!this.counterServer.getFsm().isLeader()) {
             asyncCtx.sendResponse(this.counterServer.redirect());
             return;
         }
-
+        //设置响应数据
         final ValueResponse response = new ValueResponse();
+        //封装请求数据，并回调响应结果
         final IncrementAndAddClosure closure = new IncrementAndAddClosure(counterServer, request, response,
                 status -> {
+                    //响应成功
                     if (!status.isOk()) {
                         response.setErrorMsg(status.getErrorMsg());
                         response.setSuccess(false);
                     }
+                    //发送响应请求
                     asyncCtx.sendResponse(response);
                 });
 
         try {
             final Task task = new Task();
             task.setDone(closure);
+            //序列化请求
             task.setData(ByteBuffer
-                .wrap(SerializerManager.getSerializer(SerializerManager.Hessian2).serialize(request)));
-
+                    .wrap(SerializerManager.getSerializer(SerializerManager.Hessian2).serialize(request)));
+            //调用node处理请求
             // apply task to raft group.
             counterServer.getNode().apply(task);
         } catch (final CodecException e) {
             LOG.error("Fail to encode IncrementAndGetRequest", e);
+            //请求失败，则立即响应
             response.setSuccess(false);
             response.setErrorMsg(e.getMessage());
             asyncCtx.sendResponse(response);

@@ -85,6 +85,7 @@ public final class JRaftServiceLoader<S> implements Iterable<S> {
     }
 
     public S first() {
+        //根据要加载的SPI的priority参数排序
         final List<S> sortList = sort();
         if (sortList.isEmpty()) {
             throw fail(this.service, "could not find any implementation for class");

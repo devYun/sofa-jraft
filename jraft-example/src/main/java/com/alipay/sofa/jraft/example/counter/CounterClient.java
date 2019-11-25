@@ -44,16 +44,16 @@ public class CounterClient {
         if (!conf.parse(confStr)) {
             throw new IllegalArgumentException("Fail to parse conf:" + confStr);
         }
-
+        // 更新raft group配置
         RouteTable.getInstance().updateConfiguration(groupId, conf);
-
+        //接下来初始化 RPC 客户端并更新路由表
         final BoltCliClientService cliClientService = new BoltCliClientService();
         cliClientService.init(new CliOptions());
 
         if (!RouteTable.getInstance().refreshLeader(cliClientService, groupId, 1000).isOk()) {
             throw new IllegalStateException("Refresh leader failed");
         }
-
+        //获取 leader 后发送请求
         final PeerId leader = RouteTable.getInstance().selectLeader(groupId);
         System.out.println("Leader is " + leader);
         final int n = 1000;

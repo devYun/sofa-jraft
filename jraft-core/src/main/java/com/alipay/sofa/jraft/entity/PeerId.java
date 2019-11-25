@@ -42,10 +42,13 @@ public class PeerId implements Copiable<PeerId>, Serializable, Checksum {
     private static final Logger LOG              = LoggerFactory.getLogger(PeerId.class);
 
     /** peer address */
+    //存放当前节点的ip和端口号
     private Endpoint            endpoint         = new Endpoint(Utils.IP_ANY, 0);
     /** index in same addr, default is 0. */
+    //默认是0
     private int                 idx;
     /** cached toString result*/
+    //是一个ip：端口的字符串
     private String              str;
 
     public static final PeerId  ANY_PEER         = new PeerId();

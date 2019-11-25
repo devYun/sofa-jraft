@@ -130,15 +130,19 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions> {
         }
         this.storeOpts = Requires.requireNonNull(opts, "opts");
         Endpoint serverAddress = Requires.requireNonNull(opts.getServerAddress(), "opts.serverAddress");
+        //获取ip和端口
         final int port = serverAddress.getPort();
         final String ip = serverAddress.getIp();
+        //如果传入的IP为空，那么就设置启动机器ip作为serverAddress的ip
         if (ip == null || Utils.IP_ANY.equals(ip)) {
             serverAddress = new Endpoint(NetUtil.getLocalCanonicalHostName(), port);
             opts.setServerAddress(serverAddress);
         }
+        //获取度量上报时间
         final long metricsReportPeriod = opts.getMetricsReportPeriod();
         // init region options
         List<RegionEngineOptions> rOptsList = opts.getRegionEngineOptionsList();
+        //1. 如果RegionEngineOptions为空，则默认初始化一个
         if (rOptsList == null || rOptsList.isEmpty()) {
             // -1 region
             final RegionEngineOptions rOpts = new RegionEngineOptions();
@@ -147,8 +151,11 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions> {
             rOptsList.add(rOpts);
             opts.setRegionEngineOptionsList(rOptsList);
         }
+        //获取集群名
         final String clusterName = this.pdClient.getClusterName();
+        //2. 遍历rOptsList集合，为其中的RegionEngineOptions对象设置参数
         for (final RegionEngineOptions rOpts : rOptsList) {
+            //用集群名+“-”+RegionId 拼接设置为RaftGroupId
             rOpts.setRaftGroupId(JRaftHelper.getJRaftGroupId(clusterName, rOpts.getRegionId()));
             rOpts.setServerAddress(serverAddress);
             rOpts.setInitialServerList(opts.getInitialServerList());
@@ -157,12 +164,14 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions> {
                 rOpts.setNodeOptions(opts.getCommonNodeOptions() == null ? new NodeOptions() : opts
                     .getCommonNodeOptions().copy());
             }
+            //如果原本没有设置度量上报时间，那么就重置一下
             if (rOpts.getMetricsReportPeriod() <= 0 && metricsReportPeriod > 0) {
-                // extends store opts
+                // extends store opts 300
                 rOpts.setMetricsReportPeriod(metricsReportPeriod);
             }
         }
         // init store
+        // 3. 初始化Store和Store里面的region
         final Store store = this.pdClient.getStoreMetadata(opts);
         if (store == null || store.getRegions() == null || store.getRegions().isEmpty()) {
             LOG.error("Empty store metadata: {}.", store);
@@ -170,6 +179,7 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions> {
         }
         this.storeId = store.getId();
         // init executors
+        //4. 初始化执行器
         if (this.readIndexExecutor == null) {
             this.readIndexExecutor = StoreEngineHelper.createReadIndexExecutor(opts.getReadIndexCoreThreads());
         }
@@ -179,8 +189,9 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions> {
         if (this.snapshotExecutor == null) {
             this.snapshotExecutor = StoreEngineHelper.createSnapshotExecutor(opts.getSnapshotCoreThreads());
         }
-        // init rpc executors
+        // init rpc executors 默认false
         final boolean useSharedRpcExecutor = opts.isUseSharedRpcExecutor();
+        //5. 初始化rpc远程执行器，用来执行RPCServer的Processors
         if (!useSharedRpcExecutor) {
             if (this.cliRpcExecutor == null) {
                 this.cliRpcExecutor = StoreEngineHelper.createCliRpcExecutor(opts.getCliRpcCoreThreads());
@@ -193,9 +204,12 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions> {
             }
         }
         // init metrics
+        //做指标度量
         startMetricReporters(metricsReportPeriod);
         // init rpc server
+        //6. 初始化rpcServer，供其他服务调用
         this.rpcServer = new RpcServer(port, true, true);
+        //为server加入各种processor
         RaftRpcServerFactory.addRaftRequestProcessors(this.rpcServer, this.raftRpcExecutor, this.cliRpcExecutor);
         StoreEngineHelper.addKvStoreRequestProcessor(this.rpcServer, this);
         if (!this.rpcServer.start()) {
@@ -203,15 +217,18 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions> {
             return false;
         }
         // init db store
+        //7. 根据不同的类型选择db
         if (!initRawKVStore(opts)) {
             return false;
         }
         // init all region engine
+        // 8. 为每个region初始化RegionEngine
         if (!initAllRegionEngine(opts, store)) {
             LOG.error("Fail to init all [RegionEngine].");
             return false;
         }
         // heartbeat sender
+        //如果开启了自管理的集群，那么需要初始化心跳发送器
         if (this.pdClient instanceof RemotePlacementDriverClient) {
             HeartbeatOptions heartbeatOpts = opts.getHeartbeatOptions();
             if (heartbeatOpts == null) {
@@ -578,6 +595,7 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions> {
 
     private boolean initRawKVStore(final StoreEngineOptions opts) {
         final StorageType storageType = opts.getStorageType();
+        //根据不同的类型选择db
         switch (storageType) {
             case RocksDB:
                 return initRocksDB(opts);
@@ -635,6 +653,7 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions> {
     private boolean initAllRegionEngine(final StoreEngineOptions opts, final Store store) {
         Requires.requireNonNull(opts, "opts");
         Requires.requireNonNull(store, "store");
+        //获取主目录
         String baseRaftDataPath = opts.getRaftDataPath();
         if (Strings.isNotBlank(baseRaftDataPath)) {
             try {
@@ -649,19 +668,27 @@ public class StoreEngine implements Lifecycle<StoreEngineOptions> {
         final Endpoint serverAddress = opts.getServerAddress();
         final List<RegionEngineOptions> rOptsList = opts.getRegionEngineOptionsList();
         final List<Region> regionList = store.getRegions();
+        //因为regionList是根据rOptsList来初始化的，所以这里校验一样数量是不是一样的
         Requires.requireTrue(rOptsList.size() == regionList.size());
         for (int i = 0; i < rOptsList.size(); i++) {
+            //一一对应的获取相应的RegionEngineOptions和region
             final RegionEngineOptions rOpts = rOptsList.get(i);
             final Region region = regionList.get(i);
+            //如果region路径是空的，那么就重新设值
             if (Strings.isBlank(rOpts.getRaftDataPath())) {
                 final String childPath = "raft_data_region_" + region.getId() + "_" + serverAddress.getPort();
                 rOpts.setRaftDataPath(Paths.get(baseRaftDataPath, childPath).toString());
             }
             Requires.requireNonNull(region.getRegionEpoch(), "regionEpoch");
+            //根据Region初始化RegionEngine
             final RegionEngine engine = new RegionEngine(region, this);
             if (engine.init(rOpts)) {
+                //KV Server 服务端的请求处理服务
+                // 每个 RegionKVService 对应一个 Region，只处理本身 Region 范畴内的请求
                 final RegionKVService regionKVService = new DefaultRegionKVService(engine);
+                //放入到regionKVServiceTable中
                 registerRegionKVService(regionKVService);
+                //设置region与engine映射表
                 this.regionEngineTable.put(region.getId(), engine);
             } else {
                 LOG.error("Fail to init [RegionEngine: {}].", region);

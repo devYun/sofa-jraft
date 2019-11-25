@@ -108,6 +108,7 @@ public class LocalSnapshotStorage implements SnapshotStorage {
 
         // delete temp snapshot
         if (!this.filterBeforeCopyRemote) {
+            //如果当前的文件存在了，那么强制删除
             final String tempSnapshotPath = this.path + File.separator + TEMP_PATH;
             final File tempFile = new File(tempSnapshotPath);
             if (tempFile.exists()) {
@@ -123,6 +124,7 @@ public class LocalSnapshotStorage implements SnapshotStorage {
         final List<Long> snapshots = new ArrayList<>();
         final File[] oldFiles = dir.listFiles();
         if (oldFiles != null) {
+            //找出这个文件夹下面的所有快照文件
             for (final File sFile : oldFiles) {
                 final String name = sFile.getName();
                 if (!name.startsWith(Snapshot.JRAFT_SNAPSHOT_PREFIX)) {
@@ -136,6 +138,7 @@ public class LocalSnapshotStorage implements SnapshotStorage {
         // TODO: add snapshot watcher
 
         // get last_snapshot_index
+        //删除老的快照文件
         if (!snapshots.isEmpty()) {
             Collections.sort(snapshots);
             final int snapshotCount = snapshots.size();
@@ -295,6 +298,7 @@ public class LocalSnapshotStorage implements SnapshotStorage {
         long lsIndex = 0;
         this.lock.lock();
         try {
+            //设置为最新的快照索引，将索引加一
             if (this.lastSnapshotIndex != 0) {
                 lsIndex = this.lastSnapshotIndex;
                 ref(lsIndex);
@@ -307,6 +311,7 @@ public class LocalSnapshotStorage implements SnapshotStorage {
             return null;
         }
         final String snapshotPath = getSnapshotPath(lsIndex);
+        //快照读取器
         final SnapshotReader reader = new LocalSnapshotReader(this, this.snapshotThrottle, this.addr, this.raftOptions,
             snapshotPath);
         if (!reader.init(null)) {

@@ -228,7 +228,7 @@ public class RouteTable {
                                                                                                                    TimeoutException {
         Requires.requireTrue(!StringUtils.isBlank(groupId), "Blank group id");
         Requires.requireTrue(timeoutMs > 0, "Invalid timeout: " + timeoutMs);
-
+        //根据集群的id去获取集群的配置信息，里面包括集群的ip和端口号
         final Configuration conf = getConfiguration(groupId);
         if (conf == null) {
             return new Status(RaftError.ENOENT,
@@ -237,9 +237,11 @@ public class RouteTable {
         final Status st = Status.OK();
         final CliRequests.GetLeaderRequest.Builder rb = CliRequests.GetLeaderRequest.newBuilder();
         rb.setGroupId(groupId);
+        //发送获取leader节点的请求
         final CliRequests.GetLeaderRequest request = rb.build();
         TimeoutException timeoutException = null;
         for (final PeerId peer : conf) {
+            //如果连接不上，先设置状态为error，然后continue
             if (!cliClientService.connect(peer.getEndpoint())) {
                 if (st.isOk()) {
                     st.setError(-1, "Fail to init channel to %s", peer);
@@ -249,9 +251,11 @@ public class RouteTable {
                 }
                 continue;
             }
+            //向这个节点发送获取leader的GetLeaderRequest请求
             final Future<Message> result = cliClientService.getLeader(peer.getEndpoint(), request, null);
             try {
                 final Message msg = result.get(timeoutMs, TimeUnit.MILLISECONDS);
+                //异常情况的处理
                 if (msg instanceof RpcRequests.ErrorResponse) {
                     if (st.isOk()) {
                         st.setError(-1, ((RpcRequests.ErrorResponse) msg).getErrorMsg());
@@ -261,6 +265,7 @@ public class RouteTable {
                     }
                 } else {
                     final CliRequests.GetLeaderResponse response = (CliRequests.GetLeaderResponse) msg;
+                    //重置leader
                     updateLeader(groupId, response.getLeaderId());
                     return Status.OK();
                 }
@@ -293,8 +298,10 @@ public class RouteTable {
                 "Group %s is not registered in RouteTable, forgot to call updateConfiguration?", groupId);
         }
         final Status st = Status.OK();
+        //尝试直接获取leader
         PeerId leaderId = selectLeader(groupId);
         if (leaderId == null) {
+            //刷新leader
             refreshLeader(cliClientService, groupId, timeoutMs);
             leaderId = selectLeader(groupId);
         }
@@ -302,10 +309,12 @@ public class RouteTable {
             st.setError(-1, "Fail to get leader of group %s", groupId);
             return st;
         }
+        //连接不上leader则返回error
         if (!cliClientService.connect(leaderId.getEndpoint())) {
             st.setError(-1, "Fail to init channel to %s", leaderId);
             return st;
         }
+        //向leader发起请求，获取所有存活节点
         final CliRequests.GetPeersRequest.Builder rb = CliRequests.GetPeersRequest.newBuilder();
         rb.setGroupId(groupId);
         rb.setLeaderId(leaderId.toString());
@@ -323,6 +332,7 @@ public class RouteTable {
                 if (!conf.equals(newConf)) {
                     LOG.info("Configuration of replication group {} changed from {} to {}", groupId, conf, newConf);
                 }
+                //更新集群的节点信息
                 updateConfiguration(groupId, newConf);
             } else {
                 final RpcRequests.ErrorResponse resp = (RpcRequests.ErrorResponse) result;

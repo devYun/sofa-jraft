@@ -196,6 +196,7 @@ public class BallotBox implements Lifecycle<BallotBoxOptions>, Describer {
      */
     public boolean appendPendingTask(final Configuration conf, final Configuration oldConf, final Closure done) {
         final Ballot bl = new Ballot();
+        //初始化投票箱
         if (!bl.init(conf, oldConf)) {
             LOG.error("Fail to init ballot.");
             return false;

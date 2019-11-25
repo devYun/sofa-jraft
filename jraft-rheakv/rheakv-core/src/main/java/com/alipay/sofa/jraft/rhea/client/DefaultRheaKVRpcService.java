@@ -74,6 +74,7 @@ public class DefaultRheaKVRpcService implements RheaKVRpcService {
             return true;
         }
         this.rpcCallbackExecutor = createRpcCallbackExecutor(opts);
+        //5000
         this.rpcTimeoutMillis = opts.getRpcTimeoutMillis();
         Requires.requireTrue(this.rpcTimeoutMillis > 0, "opts.rpcTimeoutMillis must > 0");
         LOG.info("[DefaultRheaKVRpcService] start successfully, options: {}.", opts);
@@ -97,8 +98,10 @@ public class DefaultRheaKVRpcService implements RheaKVRpcService {
     public <V> CompletableFuture<V> callAsyncWithRpc(final BaseRequest request, final FailoverClosure<V> closure,
                                                      final Errors lastCause, final boolean requireLeader) {
         final boolean forceRefresh = ErrorsHelper.isInvalidPeer(lastCause);
+        //获取leader的endpoint
         final Endpoint endpoint = getRpcEndpoint(request.getRegionId(), forceRefresh, this.rpcTimeoutMillis,
-            requireLeader);
+                requireLeader);
+        //发起rpc调用
         internalCallAsyncWithRpc(endpoint, request, closure);
         return closure.future();
     }
@@ -114,8 +117,10 @@ public class DefaultRheaKVRpcService implements RheaKVRpcService {
     public Endpoint getRpcEndpoint(final long regionId, final boolean forceRefresh, final long timeoutMillis,
                                    final boolean requireLeader) {
         if (requireLeader) {
+            //获取leader
             return getLeader(regionId, forceRefresh, timeoutMillis);
         } else {
+            //轮询获取一个不是自己的节点
             return getLuckyPeer(regionId, forceRefresh, timeoutMillis);
         }
     }

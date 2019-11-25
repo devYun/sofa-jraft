@@ -76,6 +76,7 @@ public class ThreadId {
             return null;
         }
         try {
+            //加锁不成功会循环阻塞10ms
             while (!this.lock.tryLock(TRY_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
                 if (this.destroyed) {
                     return null;
@@ -91,10 +92,12 @@ public class ThreadId {
             this.lock.unlock();
             return null;
         }
+        //如果没有被destroy，那么会返回data
         return this.data;
     }
 
     public void unlock() {
+        //如果锁被其他线程持有，那么就无法解锁
         if (!this.lock.isHeldByCurrentThread()) {
             LOG.warn("Fail to unlock with {}, the lock is held by {} and current thread is {}.", this.data,
                 this.lock.getOwner(), Thread.currentThread());
@@ -116,6 +119,7 @@ public class ThreadId {
                 }
             }
         } finally {
+            //如果没有错误，那么会解锁
             if (doUnlock) {
                 this.lock.unlock();
             }

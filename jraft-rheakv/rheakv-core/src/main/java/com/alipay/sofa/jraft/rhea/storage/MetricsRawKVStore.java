@@ -80,7 +80,9 @@ public class MetricsRawKVStore implements RawKVStore {
 
     @Override
     public void multiGet(final List<byte[]> keys, final boolean readOnlySafe, final KVStoreClosure closure) {
+        //实例化MetricsKVClosureAdapter对象
         final KVStoreClosure c = metricsAdapter(closure, MULTI_GET, keys.size(), 0);
+        //调用RaftRawKVStore的multiGet方法
         this.rawKVStore.multiGet(keys, readOnlySafe, c);
     }
 
@@ -134,6 +136,7 @@ public class MetricsRawKVStore implements RawKVStore {
     @Override
     public void put(final byte[] key, final byte[] value, final KVStoreClosure closure) {
         final KVStoreClosure c = metricsAdapter(closure, PUT, 1, value.length);
+        //rawKVStore是RaftRawKVStore的实例
         this.rawKVStore.put(key, value, c);
     }
 

@@ -94,23 +94,38 @@ public class RaftRpcServerFactory {
     public static void addRaftRequestProcessors(RpcServer rpcServer, Executor raftExecutor, Executor cliExecutor) {
         // raft core processors
         final AppendEntriesRequestProcessor appendEntriesRequestProcessor = new AppendEntriesRequestProcessor(
-            raftExecutor);
+                raftExecutor);
+        //添加事件处理器，当连接关闭时会调用appendEntriesRequestProcessor
         rpcServer.addConnectionEventProcessor(ConnectionEventType.CLOSE, appendEntriesRequestProcessor);
         rpcServer.registerUserProcessor(appendEntriesRequestProcessor);
+        //文件请求处理器
         rpcServer.registerUserProcessor(new GetFileRequestProcessor(raftExecutor));
+        //安装快照
         rpcServer.registerUserProcessor(new InstallSnapshotRequestProcessor(raftExecutor));
+        //选举处理器
         rpcServer.registerUserProcessor(new RequestVoteRequestProcessor(raftExecutor));
+        //响应ping请求
         rpcServer.registerUserProcessor(new PingRequestProcessor());
+        //处理立马超时的processor
         rpcServer.registerUserProcessor(new TimeoutNowRequestProcessor(raftExecutor));
+        //一致读请求处理器
         rpcServer.registerUserProcessor(new ReadIndexRequestProcessor(raftExecutor));
         // raft cli service
+        //新加节点
         rpcServer.registerUserProcessor(new AddPeerRequestProcessor(cliExecutor));
+        //移除节点
         rpcServer.registerUserProcessor(new RemovePeerRequestProcessor(cliExecutor));
+        //重置节点
         rpcServer.registerUserProcessor(new ResetPeerRequestProcessor(cliExecutor));
+        //将某个节点设置为新的节点
         rpcServer.registerUserProcessor(new ChangePeersRequestProcessor(cliExecutor));
+        //获取leader节点
         rpcServer.registerUserProcessor(new GetLeaderRequestProcessor(cliExecutor));
+        //生成快照
         rpcServer.registerUserProcessor(new SnapshotRequestProcessor(cliExecutor));
+        //指定某个节点成为leader
         rpcServer.registerUserProcessor(new TransferLeaderRequestProcessor(cliExecutor));
+        //获取所有的节点
         rpcServer.registerUserProcessor(new GetPeersRequestProcessor(cliExecutor));
     }
 

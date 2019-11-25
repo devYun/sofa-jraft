@@ -173,28 +173,34 @@ public class FSMCallerImpl implements FSMCaller {
 
     @Override
     public boolean init(final FSMCallerOptions opts) {
+        //设置日志管理器
         this.logManager = opts.getLogManager();
+        //设置状态机
         this.fsm = opts.getFsm();
+        //设置封闭队列
         this.closureQueue = opts.getClosureQueue();
+        //设置关闭时需要做的事情
         this.afterShutdown = opts.getAfterShutdown();
+        //设置Node节点
         this.node = opts.getNode();
+        //设置Metrics度量
         this.nodeMetrics = this.node.getNodeMetrics();
         this.lastAppliedIndex.set(opts.getBootstrapId().getIndex());
         notifyLastAppliedIndexUpdated(this.lastAppliedIndex.get());
         this.lastAppliedTerm = opts.getBootstrapId().getTerm();
-        this.disruptor = DisruptorBuilder.<ApplyTask> newInstance() //
-            .setEventFactory(new ApplyTaskFactory()) //
-            .setRingBufferSize(opts.getDisruptorBufferSize()) //
-            .setThreadFactory(new NamedThreadFactory("JRaft-FSMCaller-Disruptor-", true)) //
-            .setProducerType(ProducerType.MULTI) //
-            .setWaitStrategy(new BlockingWaitStrategy()) //
-            .build();
+        this.disruptor = DisruptorBuilder.<ApplyTask>newInstance() //
+                .setEventFactory(new ApplyTaskFactory()) //
+                .setRingBufferSize(opts.getDisruptorBufferSize()) //
+                .setThreadFactory(new NamedThreadFactory("JRaft-FSMCaller-Disruptor-", true)) //
+                .setProducerType(ProducerType.MULTI) //
+                .setWaitStrategy(new BlockingWaitStrategy()) //
+                .build();
         this.disruptor.handleEventsWith(new ApplyTaskHandler());
         this.disruptor.setDefaultExceptionHandler(new LogExceptionHandler<Object>(getClass().getSimpleName()));
         this.taskQueue = this.disruptor.start();
         if (this.nodeMetrics.getMetricRegistry() != null) {
             this.nodeMetrics.getMetricRegistry().register("jraft-fsm-caller-disruptor",
-                new DisruptorMetricSet(this.taskQueue));
+                    new DisruptorMetricSet(this.taskQueue));
         }
         this.error = new RaftException(EnumOutter.ErrorType.ERROR_TYPE_NONE);
         LOG.info("Starts FSMCaller successfully.");
@@ -231,6 +237,7 @@ public class FSMCallerImpl implements FSMCaller {
             LOG.warn("FSMCaller is stopped, can not apply new task.");
             return false;
         }
+        //使用Disruptor发布事件
         this.taskQueue.publishEvent(tpl);
         return true;
     }

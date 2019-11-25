@@ -165,6 +165,7 @@ public class Utils {
         if (done == null) {
             return null;
         }
+        //使用CLOSURE_EXECUTOR异步处理
         return runInThread(() -> {
             try {
                 done.run(status);

@@ -119,6 +119,7 @@ public class ReadOnlyServiceImpl implements ReadOnlyService, LastAppliedLogIndex
             }
 
             this.events.add(newEvent);
+            //批量执行
             if (this.events.size() >= ReadOnlyServiceImpl.this.raftOptions.getApplyBatch() || endOfBatch) {
                 executeReadIndexEvents(this.events);
                 this.events.clear();
@@ -147,30 +148,38 @@ public class ReadOnlyServiceImpl implements ReadOnlyService, LastAppliedLogIndex
          */
         @Override
         public void run(final Status status) {
+            //fail
+            //传入的状态不是ok，响应失败
             if (!status.isOk()) {
                 notifyFail(status);
                 return;
             }
             final ReadIndexResponse readIndexResponse = getResponse();
+            //Fail
+            //response没有响应成功，响应失败
             if (!readIndexResponse.getSuccess()) {
                 notifyFail(new Status(-1, "Fail to run ReadIndex task, maybe the leader stepped down."));
                 return;
             }
             // Success
+            //一致性读成功
             final ReadIndexStatus readIndexStatus = new ReadIndexStatus(this.states, this.request,
                 readIndexResponse.getIndex());
             for (final ReadIndexState state : this.states) {
                 // Records current commit log index.
+                //设置当前提交的index
                 state.setIndex(readIndexResponse.getIndex());
             }
 
             boolean doUnlock = true;
             ReadOnlyServiceImpl.this.lock.lock();
             try {
+                //校验applyIndex 是否超过 ReadIndex
                 if (readIndexStatus.isApplied(ReadOnlyServiceImpl.this.fsmCaller.getLastAppliedIndex())) {
                     // Already applied, notify readIndex request.
                     ReadOnlyServiceImpl.this.lock.unlock();
                     doUnlock = false;
+                    //已经同步到 ReadIndex 对应的 Log 能够提供 Linearizable Read
                     notifySuccess(readIndexStatus);
                 } else {
                     // Not applied, add it to pending-notify cache.
@@ -202,6 +211,7 @@ public class ReadOnlyServiceImpl implements ReadOnlyService, LastAppliedLogIndex
         if (events.isEmpty()) {
             return;
         }
+        //初始化ReadIndexRequest
         final ReadIndexRequest.Builder rb = ReadIndexRequest.newBuilder() //
             .setGroupId(this.node.getGroupId()) //
             .setServerId(this.node.getServerId().toString());
@@ -282,11 +292,13 @@ public class ReadOnlyServiceImpl implements ReadOnlyService, LastAppliedLogIndex
         try {
             EventTranslator<ReadIndexEvent> translator = (event, sequence) -> {
                 event.done = closure;
+                //EMPTY_BYTES
                 event.requestContext = new Bytes(reqCtx);
                 event.startTime = Utils.monotonicMs();
             };
             int retryTimes = 0;
             while (true) {
+                //ReadIndexEventHandler
                 if (this.readIndexQueue.tryPublishEvent(translator)) {
                     break;
                 } else {

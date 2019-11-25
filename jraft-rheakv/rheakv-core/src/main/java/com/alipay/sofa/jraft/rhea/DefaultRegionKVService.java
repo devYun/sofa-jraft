@@ -103,6 +103,7 @@ public class DefaultRegionKVService implements RegionKVService {
     @Override
     public void handlePutRequest(final PutRequest request,
                                  final RequestProcessClosure<BaseRequest, BaseResponse<?>> closure) {
+        //设置一个响应response
         final PutResponse response = new PutResponse();
         response.setRegionId(getRegionId());
         response.setRegionEpoch(getRegionEpoch());
@@ -110,8 +111,10 @@ public class DefaultRegionKVService implements RegionKVService {
             KVParameterRequires.requireSameEpoch(request, getRegionEpoch());
             final byte[] key = KVParameterRequires.requireNonNull(request.getKey(), "put.key");
             final byte[] value = KVParameterRequires.requireNonNull(request.getValue(), "put.value");
+            //这个实例是MetricsRawKVStore
             this.rawKVStore.put(key, value, new BaseKVStoreClosure() {
 
+                //设置回调函数
                 @Override
                 public void run(final Status status) {
                     if (status.isOk()) {
@@ -397,6 +400,7 @@ public class DefaultRegionKVService implements RegionKVService {
         try {
             KVParameterRequires.requireSameEpoch(request, getRegionEpoch());
             final List<byte[]> keys = KVParameterRequires.requireNonEmpty(request.getKeys(), "multiGet.keys");
+            //调用MetricsRawKVStore的multiGet方法
             this.rawKVStore.multiGet(keys, request.isReadOnlySafe(), new BaseKVStoreClosure() {
 
                 @SuppressWarnings("unchecked")

@@ -17,6 +17,7 @@
 package com.alipay.sofa.jraft.example.rheakv;
 
 import com.alipay.sofa.jraft.rhea.options.PlacementDriverOptions;
+import com.alipay.sofa.jraft.rhea.options.RegionEngineOptions;
 import com.alipay.sofa.jraft.rhea.options.RheaKVStoreOptions;
 import com.alipay.sofa.jraft.rhea.options.StoreEngineOptions;
 import com.alipay.sofa.jraft.rhea.options.configured.PlacementDriverOptionsConfigured;
@@ -24,7 +25,11 @@ import com.alipay.sofa.jraft.rhea.options.configured.RheaKVStoreOptionsConfigure
 import com.alipay.sofa.jraft.rhea.options.configured.RocksDBOptionsConfigured;
 import com.alipay.sofa.jraft.rhea.options.configured.StoreEngineOptionsConfigured;
 import com.alipay.sofa.jraft.rhea.storage.StorageType;
+import com.alipay.sofa.jraft.rhea.util.Constants;
 import com.alipay.sofa.jraft.util.Endpoint;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  *
@@ -36,12 +41,26 @@ public class Server1 {
         final PlacementDriverOptions pdOpts = PlacementDriverOptionsConfigured.newConfigured()
                 .withFake(true) // use a fake pd
                 .config();
+
+        List<RegionEngineOptions> rOptsList = new ArrayList<>();
+        final RegionEngineOptions rOpts1 = new RegionEngineOptions();
+        rOpts1.setRegionId(1L);
+        rOptsList.add(rOpts1);
+        final RegionEngineOptions rOpts2 = new RegionEngineOptions();
+        rOpts2.setRegionId(2L);
+        rOptsList.add(rOpts2);
+        final RegionEngineOptions rOpts3 = new RegionEngineOptions();
+        rOpts3.setRegionId(3L);
+        rOptsList.add(rOpts3);
+
         final StoreEngineOptions storeOpts = StoreEngineOptionsConfigured.newConfigured() //
                 .withStorageType(StorageType.RocksDB)
                 .withRocksDBOptions(RocksDBOptionsConfigured.newConfigured().withDbPath(Configs.DB_PATH).config())
                 .withRaftDataPath(Configs.RAFT_DATA_PATH)
                 .withServerAddress(new Endpoint("127.0.0.1", 8181))
+                .withRegionEngineOptionsList(rOptsList)
                 .config();
+
         final RheaKVStoreOptions opts = RheaKVStoreOptionsConfigured.newConfigured() //
                 .withClusterName(Configs.CLUSTER_NAME) //
                 .withInitialServerList(Configs.ALL_NODE_ADDRESSES)

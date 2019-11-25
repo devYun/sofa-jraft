@@ -44,6 +44,7 @@ public final class RecyclableByteBufferList extends ArrayList<ByteBuffer> implem
      */
     public static RecyclableByteBufferList newInstance(final int minCapacity) {
         final RecyclableByteBufferList ret = recyclers.get();
+        //容量不够的话，进行扩容
         ret.ensureCapacity(minCapacity);
         return ret;
     }
@@ -123,14 +124,14 @@ public final class RecyclableByteBufferList extends ArrayList<ByteBuffer> implem
         this.handle = handle;
     }
 
-    private transient final Recyclers.Handle                 handle;
+    private transient final Recyclers.Handle handle;
 
     private static final Recyclers<RecyclableByteBufferList> recyclers = new Recyclers<RecyclableByteBufferList>(512) {
 
-                                                                           @Override
-                                                                           protected RecyclableByteBufferList newObject(final Handle handle) {
-                                                                               return new RecyclableByteBufferList(
-                                                                                   handle);
-                                                                           }
-                                                                       };
+        @Override
+        protected RecyclableByteBufferList newObject(final Handle handle) {
+            return new RecyclableByteBufferList(
+                    handle);
+        }
+    };
 }

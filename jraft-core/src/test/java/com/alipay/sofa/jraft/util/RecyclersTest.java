@@ -31,6 +31,19 @@ import static org.junit.Assert.assertTrue;
  */
 public class RecyclersTest {
 
+    static final class RecyclableObject {
+
+        private final Recyclers.Handle handle;
+
+        private RecyclableObject(Recyclers.Handle handle) {
+            this.handle = handle;
+        }
+
+        public Recyclers.Handle getHandle() {
+            return handle;
+        }
+    }
+
     private static Recyclers<RecyclableObject> newRecyclers(final int max) {
         return new Recyclers<RecyclableObject>(max) {
 
@@ -39,6 +52,28 @@ public class RecyclersTest {
                 return new RecyclableObject(handle);
             }
         };
+    }
+
+    @Test
+    public void simpleTestMultipleRecycleAtDifferentThread() throws InterruptedException {
+        final Recyclers<RecyclableObject> recyclers = newRecyclers(512);
+        final RecyclableObject object = recyclers.get();
+        for (int i = 0; i <= 100; i++) {
+            Thread thread = new Thread(() -> recyclers.recycle(object, object.handle));
+            thread.start();
+        }
+
+        Thread.sleep(4000);
+    }
+
+    @Test
+    public void testRecycle() {
+        final Recyclers<RecyclableObject> recyclers = newRecyclers(16);
+        final RecyclableObject object = recyclers.get();
+        recyclers.recycle(object, object.handle);
+        final RecyclableObject object2 = recyclers.get();
+        Assert.assertSame(object, object2);
+        recyclers.recycle(object2, object2.handle);
     }
 
     @Test(expected = IllegalStateException.class)
@@ -53,21 +88,23 @@ public class RecyclersTest {
     public void testMultipleRecycleAtDifferentThread() throws InterruptedException {
         final Recyclers<RecyclableObject> recyclers = newRecyclers(512);
         final RecyclableObject object = recyclers.get();
-        final Thread thread1 = new Thread(() -> recyclers.recycle(object, object.handle));
-        thread1.start();
-        thread1.join();
+        //final Thread thread1 = new Thread(() -> recyclers.recycle(object, object.handle));
+        //final Thread thread2 = new Thread(() -> recyclers.recycle(object, object.handle));
+
+        for (int i = 0; i <= 100; i++) {
+            Thread thread = new Thread(() -> recyclers.recycle(object, object.handle));
+            thread.start();
+        }
+        //thread1.start();
+        //thread2.start();
+        //thread1.join();
+        //thread2.join();
+        Thread.sleep(4000);
         assertSame(object, recyclers.get());
+        //assertSame(object, recyclers.get());
     }
 
-    @Test
-    public void testRecycle() {
-        final Recyclers<RecyclableObject> recyclers = newRecyclers(16);
-        final RecyclableObject object = recyclers.get();
-        recyclers.recycle(object, object.handle);
-        final RecyclableObject object2 = recyclers.get();
-        Assert.assertSame(object, object2);
-        recyclers.recycle(object2, object2.handle);
-    }
+
 
     @Test
     public void testRecycleDisable() {
@@ -105,16 +142,5 @@ public class RecyclersTest {
             maxCapacity >= recyclers.threadLocalCapacity());
     }
 
-    static final class RecyclableObject {
 
-        private final Recyclers.Handle handle;
-
-        private RecyclableObject(Recyclers.Handle handle) {
-            this.handle = handle;
-        }
-
-        public Recyclers.Handle getHandle() {
-            return handle;
-        }
-    }
 }

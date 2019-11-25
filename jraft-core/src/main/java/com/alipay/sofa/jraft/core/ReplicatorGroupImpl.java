@@ -101,13 +101,16 @@ public class ReplicatorGroupImpl implements ReplicatorGroup {
 
     @Override
     public boolean addReplicator(final PeerId peer) {
+        //校验当前的任期
         Requires.requireTrue(this.commonOptions.getTerm() != 0);
+        //如果replicatorMap里面已经有这个节点了，那么将它从failureReplicators集合中移除
         if (this.replicatorMap.containsKey(peer)) {
             this.failureReplicators.remove(peer);
             return true;
         }
+        //赋值一个新的ReplicatorOptions
         final ReplicatorOptions opts = this.commonOptions == null ? new ReplicatorOptions() : this.commonOptions.copy();
-
+        //新的ReplicatorOptions添加这个PeerId
         opts.setPeerId(peer);
         final ThreadId rid = Replicator.start(opts, this.raftOptions);
         if (rid == null) {
@@ -156,6 +159,7 @@ public class ReplicatorGroupImpl implements ReplicatorGroup {
 
     @Override
     public void checkReplicator(final PeerId peer, final boolean lockNode) {
+        //根据传入的peer获取相应的ThreadId
         final ThreadId rid = this.replicatorMap.get(peer);
         // noinspection StatementWithEmptyBody
         if (rid == null) {
@@ -165,6 +169,7 @@ public class ReplicatorGroupImpl implements ReplicatorGroup {
                 node.writeLock.lock();
             }
             try {
+                //如果当前的节点是leader，并且传入的peer在failureReplicators中，那么重新添加到replicatorMap
                 if (node.isLeader() && this.failureReplicators.contains(peer) && addReplicator(peer)) {
                     this.failureReplicators.remove(peer);
                 }
@@ -233,6 +238,8 @@ public class ReplicatorGroupImpl implements ReplicatorGroup {
     @Override
     public ThreadId stopAllAndFindTheNextCandidate(final ConfigurationEntry conf) {
         ThreadId candidate = null;
+        //找到下一个候选节点
+        //这个节点必须是logIndex最大的那个
         final PeerId candidateId = this.findTheNextCandidate(conf);
         if (candidateId != null) {
             candidate = this.replicatorMap.get(candidateId);
@@ -257,6 +264,7 @@ public class ReplicatorGroupImpl implements ReplicatorGroup {
             if (!conf.contains(entry.getKey())) {
                 continue;
             }
+            //nextIndex是LogManager里面的lastLogIndex的值加1
             final long nextIndex = Replicator.getNextIndex(entry.getValue());
             if (nextIndex > maxIndex) {
                 maxIndex = nextIndex;
@@ -267,6 +275,7 @@ public class ReplicatorGroupImpl implements ReplicatorGroup {
         if (maxIndex == -1L) {
             return null;
         } else {
+            //也就是说这里拿到的是最大的LogIndex所对应的peerId
             return peerId;
         }
     }

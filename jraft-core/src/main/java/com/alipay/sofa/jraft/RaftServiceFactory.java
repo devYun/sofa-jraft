@@ -43,7 +43,9 @@ public final class RaftServiceFactory {
      * Throw {@link IllegalStateException} when fail to initialize.
      */
     public static Node createAndInitRaftNode(final String groupId, final PeerId serverId, final NodeOptions opts) {
+        //实例化一个node节点
         final Node ret = createRaftNode(groupId, serverId);
+        //为node节点初始化
         if (!ret.init(opts)) {
             throw new IllegalStateException("Fail to init node, please see the logs to find the reason.");
         }

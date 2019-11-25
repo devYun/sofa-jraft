@@ -251,6 +251,7 @@ public class AppendEntriesRequestProcessor extends NodeRequestProcessor<AppendEn
     PeerRequestContext getPeerRequestContext(final String groupId, final String peerId, final Connection conn) {
         ConcurrentMap<String/* peerId */, PeerRequestContext> groupContexts = this.peerRequestContexts.get(groupId);
         if (groupContexts == null) {
+            //如果为空的话，创建一个新的
             groupContexts = new ConcurrentHashMap<>();
             final ConcurrentMap<String, PeerRequestContext> existsCtxs = this.peerRequestContexts.putIfAbsent(groupId,
                 groupContexts);
@@ -264,6 +265,7 @@ public class AppendEntriesRequestProcessor extends NodeRequestProcessor<AppendEn
             synchronized (Utils.withLockObject(groupContexts)) {
                 peerCtx = groupContexts.get(peerId);
                 // double check in lock
+                //双重校验
                 if (peerCtx == null) {
                     // only one thread to process append entries for every jraft node
                     final PeerId peer = new PeerId();
@@ -342,11 +344,13 @@ public class AppendEntriesRequestProcessor extends NodeRequestProcessor<AppendEn
 
         final Node node = (Node) service;
 
+        //默认使用pipeline
         if (node.getRaftOptions().isReplicatorPipeline()) {
             final String groupId = request.getGroupId();
             final String peerId = request.getPeerId();
 
             final int reqSequence = getAndIncrementSequence(groupId, peerId, done.getBizContext().getConnection());
+            //Follower处理leader发过来的日志赋值请求
             final Message response = service.handleAppendEntriesRequest(request, new SequenceRpcRequestClosure(done,
                 reqSequence, groupId, peerId));
             if (response != null) {

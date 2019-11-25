@@ -113,21 +113,26 @@ public class RaftGroupService {
      * @param startRpcServer whether to start RPC server.
      */
     public synchronized Node start(final boolean startRpcServer) {
+        //如果已经启动了，那么就返回
         if (this.started) {
             return this.node;
         }
+        //校验serverId和groupId
         if (this.serverId == null || this.serverId.getEndpoint() == null
-            || this.serverId.getEndpoint().equals(new Endpoint(Utils.IP_ANY, 0))) {
+                || this.serverId.getEndpoint().equals(new Endpoint(Utils.IP_ANY, 0))) {
             throw new IllegalArgumentException("Blank serverId:" + this.serverId);
         }
         if (StringUtils.isBlank(this.groupId)) {
             throw new IllegalArgumentException("Blank group id" + this.groupId);
         }
         //Adds RPC server to Server.
+        //设置当前node的ip和端口
         NodeManager.getInstance().addAddress(this.serverId.getEndpoint());
 
+        //创建node
         this.node = RaftServiceFactory.createAndInitRaftNode(this.groupId, this.serverId, this.nodeOptions);
         if (startRpcServer) {
+            //启动远程服务
             this.rpcServer.start();
         } else {
             LOG.warn("RPC server is not started in RaftGroupService.");

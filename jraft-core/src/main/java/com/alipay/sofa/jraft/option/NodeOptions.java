@@ -33,13 +33,14 @@ import com.alipay.sofa.jraft.util.Utils;
  * 2018-Apr-04 2:59:12 PM
  */
 public class NodeOptions extends RpcOptions implements Copiable<NodeOptions> {
-
+    //根据spi加载JRaftServiceFactory的实现类，并获取优先级最高的实例
     public static final JRaftServiceFactory defaultServiceFactory  = JRaftServiceLoader.load(JRaftServiceFactory.class) //
                                                                        .first();
 
     // A follower would become a candidate if it doesn't receive any message
     // from the leader in |election_timeout_ms| milliseconds
     // Default: 1000 (1s)
+    //如果一个follower在electionTimeoutMs内没有收到任何消息，那么这个Follower会变成候选者
     private int                             electionTimeoutMs      = 1000;                                         // follower to candidate timeout
 
     // Leader lease time's ratio of electionTimeoutMs,
@@ -53,6 +54,7 @@ public class NodeOptions extends RpcOptions implements Copiable<NodeOptions> {
     // If |snapshot_interval_s| <= 0, the time based snapshot would be disabled.
     //
     // Default: 3600 (1 hour)
+    //每个小时会触发生成快照
     private int                             snapshotIntervalSecs   = 3600;
 
     // We will regard a adding peer as caught up if the margin between the
@@ -72,6 +74,7 @@ public class NodeOptions extends RpcOptions implements Copiable<NodeOptions> {
 
     // The specific StateMachine implemented your business logic, which must be
     // a valid instance.
+    //状态机
     private StateMachine                    fsm;
 
     // Describe a specific LogStorage in format ${type}://${parameters}

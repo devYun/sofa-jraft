@@ -192,11 +192,14 @@ public class RegionRouteTable {
 
     private Region findRegionByKeyWithoutLock(final byte[] key) {
         // return the greatest key less than or equal to the given key
+        //rangeTable里面存的是region的startKey，value是regionId
+        // 这里返回小于等于key的第一个元素
         final Map.Entry<byte[], Long> entry = this.rangeTable.floorEntry(key);
         if (entry == null) {
             reportFail(key);
             throw reject(key, "fail to find region by key");
         }
+        //regionTable里面存的regionId，value是region
         return this.regionTable.get(entry.getValue());
     }
 
@@ -224,12 +227,15 @@ public class RegionRouteTable {
      */
     public Map<Region, List<KVEntry>> findRegionsByKvEntries(final List<KVEntry> kvEntries) {
         Requires.requireNonNull(kvEntries, "kvEntries");
+        //实例化一个map
         final Map<Region, List<KVEntry>> regionMap = Maps.newHashMap();
         final StampedLock stampedLock = this.stampedLock;
         final long stamp = stampedLock.readLock();
         try {
             for (final KVEntry kvEntry : kvEntries) {
+                //根据kvEntry的key去找和region的startKey最接近的region
                 final Region region = findRegionByKeyWithoutLock(kvEntry.getKey());
+                //设置region和KVEntry的映射关系
                 regionMap.computeIfAbsent(region, k -> Lists.newArrayList()).add(kvEntry);
             }
             return regionMap;

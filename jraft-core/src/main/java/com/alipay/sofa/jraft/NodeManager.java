@@ -45,7 +45,7 @@ public class NodeManager {
     private final ConcurrentMap<NodeId, Node>       nodeMap  = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, List<Node>> groupMap = new ConcurrentHashMap<>();
     private final ConcurrentHashSet<Endpoint>       addrSet  = new ConcurrentHashSet<>();
-
+    //NodeManager是单例的
     public static NodeManager getInstance() {
         return INSTANCE;
     }

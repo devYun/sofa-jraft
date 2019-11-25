@@ -153,12 +153,13 @@ public class RocksDBLogStorage implements LogStorage {
                 LOG.warn("RocksDBLogStorage init() already.");
                 return true;
             }
+            //获取日志的编解码器
             this.logEntryDecoder = opts.getLogEntryCodecFactory().decoder();
             this.logEntryEncoder = opts.getLogEntryCodecFactory().encoder();
             Requires.requireNonNull(this.logEntryDecoder, "Null log entry decoder");
             Requires.requireNonNull(this.logEntryEncoder, "Null log entry encoder");
+            //初始化rocksDB配置
             this.dbOptions = createDBOptions();
-
             this.writeOptions = new WriteOptions();
             this.writeOptions.setSync(this.sync);
             this.totalOrderReadOptions = new ReadOptions();

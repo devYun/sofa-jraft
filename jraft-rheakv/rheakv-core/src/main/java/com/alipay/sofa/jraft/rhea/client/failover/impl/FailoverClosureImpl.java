@@ -67,7 +67,8 @@ public final class FailoverClosureImpl<T> extends BaseKVStoreClosure implements 
 
         final Errors error = getError();
         if (this.retriesLeft > 0
-            && (ErrorsHelper.isInvalidPeer(error) || (this.retryOnInvalidEpoch && ErrorsHelper.isInvalidEpoch(error)))) {
+            && (ErrorsHelper.isInvalidPeer(error) ||
+                (this.retryOnInvalidEpoch && ErrorsHelper.isInvalidEpoch(error)))) {
             LOG.warn("[Failover] status: {}, error: {}, [{}] retries left.", status, error, this.retriesLeft);
             this.retryRunner.run(error);
         } else {

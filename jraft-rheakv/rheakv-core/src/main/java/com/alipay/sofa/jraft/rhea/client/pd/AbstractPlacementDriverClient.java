@@ -80,16 +80,19 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
         initCli(opts.getCliOptions());
         this.pdRpcService = new DefaultPlacementDriverRpcService(this);
         RpcOptions rpcOpts = opts.getPdRpcOptions();
+        //如果传入是空的
         if (rpcOpts == null) {
             rpcOpts = RpcOptionsConfigured.newDefaultConfig();
             rpcOpts.setCallbackExecutorCorePoolSize(0);
             rpcOpts.setCallbackExecutorMaximumPoolSize(0);
         }
+        //初始化rpc服务
         if (!this.pdRpcService.init(rpcOpts)) {
             LOG.error("Fail to init [PlacementDriverRpcService].");
             return false;
         }
         // region route table
+        //获取region路由表
         final List<RegionRouteTableOptions> regionRouteTableOptionsList = opts.getRegionRouteTableOptionsList();
         if (regionRouteTableOptionsList != null) {
             final String initialServerList = opts.getInitialServerList();
@@ -145,6 +148,7 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
         if (forceRefresh) {
             refreshRouteTable();
         }
+        //regionRouteTable里面存了region的路由信息
         return this.regionRouteTable.findRegionsByKvEntries(kvEntries);
     }
 
@@ -222,10 +226,13 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
 
     @Override
     public Endpoint getLeader(final long regionId, final boolean forceRefresh, final long timeoutMillis) {
+        //这里会根据clusterName和regionId拼接出raftGroupId
         final String raftGroupId = JRaftHelper.getJRaftGroupId(this.clusterName, regionId);
+        //去路由表里找这个集群的leader
         PeerId leader = getLeader(raftGroupId, forceRefresh, timeoutMillis);
         if (leader == null && !forceRefresh) {
             // Could not found leader from cache, try again and force refresh cache
+            // 如果第一次没有找到，那么执行强制刷新的方法再找一次
             leader = getLeader(raftGroupId, true, timeoutMillis);
         }
         if (leader == null) {
@@ -236,6 +243,7 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
 
     protected PeerId getLeader(final String raftGroupId, final boolean forceRefresh, final long timeoutMillis) {
         final RouteTable routeTable = RouteTable.getInstance();
+        //是否要强制刷新路由表
         if (forceRefresh) {
             final long deadline = System.currentTimeMillis() + timeoutMillis;
             final StringBuilder error = new StringBuilder();
@@ -244,6 +252,7 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
             Throwable lastCause = null;
             for (;;) {
                 try {
+                    //刷新节点路由表
                     final Status st = routeTable.refreshLeader(this.cliClientService, raftGroupId, 2000);
                     if (st.isOk()) {
                         break;
@@ -255,6 +264,7 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
                     lastCause = t;
                     error.append(t.getMessage());
                 }
+                //如果还没有到截止时间，那么sleep10毫秒之后再刷新
                 if (System.currentTimeMillis() < deadline) {
                     LOG.debug("Fail to find leader, retry again, {}.", error);
                     error.append(", ");
@@ -263,12 +273,14 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
                     } catch (final InterruptedException e) {
                         ThrowUtil.throwException(e);
                     }
+                //    到了截止时间，那么抛出异常
                 } else {
                     throw lastCause != null ? new RouteTableException(error.toString(), lastCause)
                         : new RouteTableException(error.toString());
                 }
             }
         }
+        //返回路由表里面的leader
         return routeTable.selectLeader(raftGroupId);
     }
 
@@ -277,6 +289,7 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
                                  final Endpoint unExpect) {
         final String raftGroupId = JRaftHelper.getJRaftGroupId(this.clusterName, regionId);
         final RouteTable routeTable = RouteTable.getInstance();
+        //是否要强制刷新一下最新的集群节点信息
         if (forceRefresh) {
             final long deadline = System.currentTimeMillis() + timeoutMillis;
             final StringBuilder error = new StringBuilder();
@@ -315,10 +328,12 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
         if (peerList == null || peerList.isEmpty()) {
             throw new RouteTableException("empty peers in group: " + raftGroupId);
         }
+        //如果这个集群里只有一个节点了，那么直接返回就好了
         final int size = peerList.size();
         if (size == 1) {
             return peerList.get(0).getEndpoint();
         }
+        //获取负载均衡器，这里用的是轮询策略
         final RoundRobinLoadBalancer balancer = RoundRobinLoadBalancer.getInstance(regionId);
         for (int i = 0; i < size; i++) {
             final PeerId candidate = balancer.select(peerList);
@@ -385,6 +400,7 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
         final byte[] startKey = opts.getStartKeyBytes();
         final byte[] endKey = opts.getEndKeyBytes();
         final String initialServerList = opts.getInitialServerList();
+        //实例化region
         final Region region = new Region();
         final Configuration conf = new Configuration();
         // region
@@ -394,7 +410,9 @@ public abstract class AbstractPlacementDriverClient implements PlacementDriverCl
         region.setRegionEpoch(new RegionEpoch(-1, -1));
         // peers
         Requires.requireTrue(Strings.isNotBlank(initialServerList), "opts.initialServerList is blank");
+        //将集群ip和端口解析到peer中
         conf.parse(initialServerList);
+        //每个region都会存有集群的信息
         region.setPeers(JRaftHelper.toPeerList(conf.listPeers()));
         this.regionRouteTable.addOrUpdateRegion(region);
         return region;

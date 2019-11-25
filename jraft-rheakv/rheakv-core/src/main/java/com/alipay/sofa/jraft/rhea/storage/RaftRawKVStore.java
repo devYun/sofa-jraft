@@ -70,14 +70,18 @@ public class RaftRawKVStore implements RawKVStore {
             this.kvStore.get(key, false, closure);
             return;
         }
+        //发起线性一致性读
         this.node.readIndex(BytesUtil.EMPTY_BYTES, new ReadIndexClosure() {
 
             @Override
             public void run(final Status status, final long index, final byte[] reqCtx) {
+                //调用RocksRawKVStore获取数据
                 if (status.isOk()) {
                     RaftRawKVStore.this.kvStore.get(key, true, closure);
                     return;
                 }
+                //readIndex 读取失败尝试应用键值读操作申请任务于 Leader 节点的状态机 KVStoreStateMachine
+                // SOFAJRaft 保证读取的线性一致性
                 RaftRawKVStore.this.readIndexExecutor.execute(() -> {
                     if (isLeader()) {
                         LOG.warn("Fail to [get] with 'ReadIndex': {}, try to applying to the state machine.", status);
@@ -91,6 +95,7 @@ public class RaftRawKVStore implements RawKVStore {
                 });
             }
         });
+
     }
 
     @Override
@@ -104,17 +109,22 @@ public class RaftRawKVStore implements RawKVStore {
             this.kvStore.multiGet(keys, false, closure);
             return;
         }
+        // KV 存储实现线性一致读
+        // 调用 readIndex 方法，等待回调执行
         this.node.readIndex(BytesUtil.EMPTY_BYTES, new ReadIndexClosure() {
 
             @Override
             public void run(final Status status, final long index, final byte[] reqCtx) {
+                //如果状态返回成功，
                 if (status.isOk()) {
                     RaftRawKVStore.this.kvStore.multiGet(keys, true, closure);
                     return;
                 }
+                //readIndex 读取失败尝试应用键值读操作申请任务于 Leader 节点的状态机 KVStoreStateMachine
                 RaftRawKVStore.this.readIndexExecutor.execute(() -> {
                     if (isLeader()) {
-                        LOG.warn("Fail to [multiGet] with 'ReadIndex': {}, try to applying to the state machine.", status);
+                        LOG.warn("Fail to [multiGet] with 'ReadIndex': {}, try to applying to the state machine.",
+                                status);
                         // If 'read index' read fails, try to applying to the state machine at the leader node
                         applyOperation(KVOperation.createMultiGet(keys), closure);
                     } else {
@@ -287,14 +297,18 @@ public class RaftRawKVStore implements RawKVStore {
     }
 
     private void applyOperation(final KVOperation op, final KVStoreClosure closure) {
+        //这里必须保证 Leader 节点操作申请任务
         if (!isLeader()) {
             closure.setError(Errors.NOT_LEADER);
             closure.run(new Status(RaftError.EPERM, "Not leader"));
             return;
         }
         final Task task = new Task();
+        //封装数据
         task.setData(ByteBuffer.wrap(Serializers.getDefault().writeObject(op)));
+        //封装回调方法
         task.setDone(new KVClosureAdapter(closure, op));
+        //调用NodeImpl的apply方法
         this.node.apply(task);
     }
 

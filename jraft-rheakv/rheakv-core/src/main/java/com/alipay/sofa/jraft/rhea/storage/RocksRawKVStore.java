@@ -134,6 +134,7 @@ public class RocksRawKVStore extends BatchRawKVStore<RocksDBOptions> {
             }
             this.opts = opts;
             this.options = createDBOptions();
+            //默认是true
             if (opts.isOpenStatisticsCollector()) {
                 this.statistics = new Statistics();
                 this.options.setStatistics(this.statistics);
@@ -245,6 +246,7 @@ public class RocksRawKVStore extends BatchRawKVStore<RocksDBOptions> {
         readLock.lock();
         try {
             final byte[] value = this.db.get(key);
+            //将数据返回到回调函数里面
             setSuccess(closure, value);
         } catch (final Exception e) {
             LOG.error("Fail to [GET], key: [{}], {}.", BytesUtil.toHex(key), StackTraceUtil.stackTrace(e));
@@ -648,6 +650,7 @@ public class RocksRawKVStore extends BatchRawKVStore<RocksDBOptions> {
 
     @Override
     public void put(final List<KVEntry> entries, final KVStoreClosure closure) {
+        //用来做度量用的
         final Timer.Context timeCtx = getTimeContext("PUT_LIST");
         final Lock readLock = this.readWriteLock.readLock();
         readLock.lock();

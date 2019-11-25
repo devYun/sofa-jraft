@@ -180,15 +180,19 @@ public class LogManagerImpl implements LogManager {
             LogStorageOptions lsOpts = new LogStorageOptions();
             lsOpts.setConfigurationManager(this.configManager);
             lsOpts.setLogEntryCodecFactory(opts.getLogEntryCodecFactory());
-
+            //初始化日志存储
             if (!this.logStorage.init(lsOpts)) {
                 LOG.error("Fail to init logStorage");
                 return false;
             }
+            //读取日志的第一个索引
             this.firstLogIndex = this.logStorage.getFirstLogIndex();
+            //读取日志的最后一个索引
             this.lastLogIndex = this.logStorage.getLastLogIndex();
+            //获取日志文件的最后的索引和索引所对应的日志文件的leader的任期
             this.diskId = new LogId(this.lastLogIndex, getTermFromLogStorage(this.lastLogIndex));
             this.fsmCaller = opts.getFsmCaller();
+            //初始化一个disruptor
             this.disruptor = DisruptorBuilder.<StableClosureEvent> newInstance() //
                     .setEventFactory(new StableClosureEventFactory()) //
                     .setRingBufferSize(opts.getDisruptorBufferSize()) //
@@ -304,6 +308,7 @@ public class LogManagerImpl implements LogManager {
         boolean doUnlock = true;
         this.writeLock.lock();
         try {
+            //解决本地日志和  Entries 之间的冲突
             if (!entries.isEmpty() && !checkAndResolveConflict(entries, done)) {
                 entries.clear();
                 Utils.runClosureInThread(done, new Status(RaftError.EINTERNAL, "Fail to checkAndResolveConflict."));
@@ -315,29 +320,35 @@ public class LogManagerImpl implements LogManager {
                 if (this.raftOptions.isEnableLogEntryChecksum()) {
                     entry.setChecksum(entry.checksum());
                 }
+                //遍历日志条目 Log Entries 检查类型是否为配置变更
                 if (entry.getType() == EntryType.ENTRY_TYPE_CONFIGURATION) {
                     Configuration oldConf = new Configuration();
                     if (entry.getOldPeers() != null) {
                         oldConf = new Configuration(entry.getOldPeers());
                     }
+                    //配置管理器 ConfigurationManager 缓存配置变更 Entry
                     final ConfigurationEntry conf = new ConfigurationEntry(entry.getId(),
                         new Configuration(entry.getPeers()), oldConf);
                     this.configManager.add(conf);
                 }
             }
+            //将现有日志条目 Entries 添加到 logsInMemory 进行缓存
             if (!entries.isEmpty()) {
                 done.setFirstLogIndex(entries.get(0).getId().getIndex());
                 this.logsInMemory.addAll(entries);
             }
+            //稳定状态回调 StableClosure 设置需要存储的日志
             done.setEntries(entries);
 
             int retryTimes = 0;
+            //发布 OTHER 类型事件到稳定状态回调 StableClosure 事件队列
             final EventTranslator<StableClosureEvent> translator = (event, sequence) -> {
                 event.reset();
                 event.type = EventType.OTHER;
                 event.done = done;
             };
             while (true) {
+                //触发稳定状态回调 StableClosure 事件处理器 StableClosureEventHandler 处理该事件
                 if (tryOfferEvent(done, translator)) {
                     break;
                 } else {
@@ -508,11 +519,17 @@ public class LogManagerImpl implements LogManager {
             }
             final StableClosure done = event.done;
 
+            //判断任务回调 StableClosure 的 Log Entries 是否为空
+            //如果任务回调的 Log Entries 为非空需积攒日志条目批量 Flush
             if (done.getEntries() != null && !done.getEntries().isEmpty()) {
                 this.ab.append(done);
             } else {
                 this.lastId = this.ab.flush();
                 boolean ret = true;
+                //则检查 StableClosureEvent 事件类型
+                // 事件类型为SHUTDOWN、RESET、TRUNCATE_PREFIX、TRUNCATE_SUFFIX、LAST_LOG_ID
+                // 时调用底层日志存储 LogStorage 进行指定事件回调 ResetClosure、TruncatePrefixClosure、
+                // TruncateSufLogEntryAndClosureHandlerfixClosure、LastLogIdClosure 处理
                 switch (event.type) {
                     case LAST_LOG_ID:
                         ((LastLogIdClosure) done).setLastLogId(this.lastId.copy());
@@ -560,6 +577,7 @@ public class LogManagerImpl implements LogManager {
                 }
             }
             if (endOfBatch) {
+                //操作调用底层LogStorage 存储日志 Entries
                 this.lastId = this.ab.flush();
                 setDiskId(this.lastId);
             }
@@ -750,8 +768,10 @@ public class LogManagerImpl implements LogManager {
     }
 
     private long getTermFromLogStorage(final long index) {
+        //根据索引获取实体类
         LogEntry entry = this.logStorage.getEntry(index);
         if (entry != null) {
+            //日志的正确性检查
             if (this.raftOptions.isEnableLogEntryChecksum() && entry.isCorrupted()) {
                 // Report error to node and throw exception.
                 String msg = String.format(

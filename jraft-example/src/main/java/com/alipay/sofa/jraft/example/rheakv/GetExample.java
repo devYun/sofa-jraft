@@ -37,7 +37,14 @@ public class GetExample {
     public static void main(final String[] args) throws Exception {
         final Client client = new Client();
         client.init();
-        get(client.getRheaKVStore());
+        //get(client.getRheaKVStore());
+        RheaKVStore rheaKVStore = client.getRheaKVStore();
+        final byte[] key = writeUtf8("hello");
+        final byte[] value = writeUtf8("world");
+        rheaKVStore.bPut(key, value);
+
+        final byte[] b1 = rheaKVStore.bGet(key);
+        LOG.info("Sync get result={}", readUtf8(b1));
         client.shutdown();
     }
 

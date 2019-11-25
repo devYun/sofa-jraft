@@ -34,12 +34,14 @@ public class RpcOptions {
 
     /**
      * Install snapshot RPC request default timeout in milliseconds
+     * 生成快照的请求超时时间 5分钟
      * Default: 5 * 60 * 1000(5min)
      */
     private int            rpcInstallSnapshotTimeout  = 5 * 60 * 1000;
 
     /**
      * RPC process thread pool size
+     * rpc的处理器线程数
      * Default: 80
      */
     private int            rpcProcessorThreadPoolSize = 80;

@@ -49,7 +49,10 @@ public class ProtobufMsgFactory {
     private static Map<String/* class name in java file */, MethodHandle>  PARSE_METHODS_4J     = new HashMap<>();
 
     static {
+        //这段代码是用来加载所有的proto文件，并封装到PARSE_METHODS_4J和PARSE_METHODS_4PROTO
         try {
+            //如果不了解protobuf的同学可以看一下这篇文章：
+            //https://developers.google.com/protocol-buffers/docs/javatutorial#writing-a-message
             FileDescriptorSet descriptorSet = FileDescriptorSet.parseFrom(ProtoBufFile.class
                 .getResourceAsStream("/raft.desc"));
             List<FileDescriptor> resolveFDs = new ArrayList<>();

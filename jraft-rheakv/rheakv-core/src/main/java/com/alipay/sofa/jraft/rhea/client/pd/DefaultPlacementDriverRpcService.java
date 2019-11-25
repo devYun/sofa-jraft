@@ -68,7 +68,9 @@ public class DefaultPlacementDriverRpcService implements PlacementDriverRpcServi
             LOG.info("[DefaultPlacementDriverRpcService] already started.");
             return true;
         }
+        //初始化一个回调线程池
         this.rpcCallbackExecutor = createRpcCallbackExecutor(opts);
+        //设置rpc超时时间
         this.rpcTimeoutMillis = opts.getRpcTimeoutMillis();
         Requires.requireTrue(this.rpcTimeoutMillis > 0, "opts.rpcTimeoutMillis must > 0");
         LOG.info("[DefaultPlacementDriverRpcService] start successfully, options: {}.", opts);
