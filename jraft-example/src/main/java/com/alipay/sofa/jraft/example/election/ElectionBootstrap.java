@@ -16,13 +16,16 @@
  */
 package com.alipay.sofa.jraft.example.election;
 
+import com.alipay.sofa.jraft.entity.PeerId;
+
 /**
  *
  * @author jiachun.fjc
  */
 public class ElectionBootstrap {
 
-    // 启动 3 个实例选举, 注意如果实在同一台机器启动多个实例, 那么第一个参数 dataPath 不能相同
+    // Start elections by 3 instance. Note that if multiple instances are started on the same machine,
+    // the first parameter `dataPath` should not be the same.
     public static void main(final String[] args) {
         if (args.length < 4) {
             System.out
@@ -45,8 +48,13 @@ public class ElectionBootstrap {
         final ElectionNode node = new ElectionNode();
         node.addLeaderStateListener(new LeaderStateListener() {
 
+            PeerId serverId = node.getNode().getLeaderId();
+            String ip       = serverId.getIp();
+            int    port     = serverId.getPort();
+
             @Override
             public void onLeaderStart(long leaderTerm) {
+                System.out.println("[ElectionBootstrap] Leader's ip is: " + ip + ", port: " + port);
                 System.out.println("[ElectionBootstrap] Leader start on term: " + leaderTerm);
             }
 

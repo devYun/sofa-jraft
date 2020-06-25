@@ -77,7 +77,7 @@ public class ScanExample {
         final List<KVEntry> l4 = rheaKVStore.bScan(firstKeyString, lastKeyString, false);
         for (final List<KVEntry> l : new List[] { l1, l2, l3, l4 }) {
             for (final KVEntry kv : l) {
-                LOG.info("Async scan: key={}, value={}", readUtf8(kv.getKey()), readUtf8(kv.getValue()));
+                LOG.info("sync scan: key={}, value={}", readUtf8(kv.getKey()), readUtf8(kv.getValue()));
             }
         }
     }

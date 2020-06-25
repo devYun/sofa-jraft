@@ -24,47 +24,46 @@ import com.alipay.sofa.jraft.error.RaftError;
 import com.alipay.sofa.jraft.rpc.CliRequests.AddPeerRequest;
 import com.alipay.sofa.jraft.rpc.CliRequests.AddPeerResponse;
 import com.alipay.sofa.jraft.rpc.RpcRequestClosure;
-import com.alipay.sofa.jraft.rpc.RpcResponseFactory;
+import com.alipay.sofa.jraft.util.RpcFactoryHelper;
 import com.google.protobuf.Message;
 
 /**
  * AddPeer request processor.
  *
  * @author boyan (boyan@alibaba-inc.com)
- *
- * 2018-Apr-09 11:33:50 AM
+ * @author jiachun.fjc
  */
 public class AddPeerRequestProcessor extends BaseCliRequestProcessor<AddPeerRequest> {
 
     public AddPeerRequestProcessor(Executor executor) {
-        super(executor);
+        super(executor, AddPeerResponse.getDefaultInstance());
     }
 
     @Override
-    protected String getPeerId(AddPeerRequest request) {
+    protected String getPeerId(final AddPeerRequest request) {
         return request.getLeaderId();
     }
 
     @Override
-    protected String getGroupId(AddPeerRequest request) {
+    protected String getGroupId(final AddPeerRequest request) {
         return request.getGroupId();
     }
 
     @Override
-    protected Message processRequest0(CliRequestContext ctx, AddPeerRequest request, RpcRequestClosure done) {
-        List<PeerId> oldPeers = ctx.node.listPeers();
-        String addingPeerIdStr = request.getPeerId();
-        PeerId addingPeer = new PeerId();
+    protected Message processRequest0(final CliRequestContext ctx, final AddPeerRequest request, final RpcRequestClosure done) {
+        final List<PeerId> oldPeers = ctx.node.listPeers();
+        final String addingPeerIdStr = request.getPeerId();
+        final PeerId addingPeer = new PeerId();
         if (addingPeer.parse(addingPeerIdStr)) {
-            LOG.info("Receive AddPeerRequest to {} from {}, adding {}", ctx.node.getNodeId(), done.getBizContext()
+            LOG.info("Receive AddPeerRequest to {} from {}, adding {}", ctx.node.getNodeId(), done.getRpcCtx()
                 .getRemoteAddress(), addingPeerIdStr);
             ctx.node.addPeer(addingPeer, status -> {
                 if (!status.isOk()) {
                     done.run(status);
                 } else {
-                    AddPeerResponse.Builder rb = AddPeerResponse.newBuilder();
+                    final AddPeerResponse.Builder rb = AddPeerResponse.newBuilder();
                     boolean alreadyExists = false;
-                    for (PeerId oldPeer : oldPeers) {
+                    for (final PeerId oldPeer : oldPeers) {
                         rb.addOldPeers(oldPeer.toString());
                         rb.addNewPeers(oldPeer.toString());
                         if (oldPeer.equals(addingPeer)) {
@@ -78,7 +77,9 @@ public class AddPeerRequestProcessor extends BaseCliRequestProcessor<AddPeerRequ
                 }
             });
         } else {
-            return RpcResponseFactory.newResponse(RaftError.EINVAL, "Fail to parse peer id %", addingPeerIdStr);
+            return RpcFactoryHelper //
+                .responseFactory() //
+                .newResponse(defaultResp(), RaftError.EINVAL, "Fail to parse peer id %s", addingPeerIdStr);
         }
 
         return null;

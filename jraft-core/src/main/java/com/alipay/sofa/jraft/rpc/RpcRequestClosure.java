@@ -16,50 +16,48 @@
  */
 package com.alipay.sofa.jraft.rpc;
 
-import com.alipay.remoting.AsyncContext;
-import com.alipay.remoting.BizContext;
 import com.alipay.sofa.jraft.Closure;
 import com.alipay.sofa.jraft.Status;
+import com.alipay.sofa.jraft.util.RpcFactoryHelper;
 import com.google.protobuf.Message;
 
 /**
  * RPC request Closure encapsulates the RPC contexts.
  *
  * @author boyan (boyan@alibaba-inc.com)
- *
- * 2018-Mar-28 4:55:24 PM
+ * @author jiachun.fjc
  */
 public class RpcRequestClosure implements Closure {
 
-    private final BizContext   bizContext;
-    private final AsyncContext asyncContext;
-    private boolean            respond;
+    private final RpcContext rpcCtx;
+    private final Message    defaultResp;
+    private boolean          respond;
 
-    public RpcRequestClosure(BizContext bizContext, AsyncContext asyncContext) {
+    public RpcRequestClosure(RpcContext rpcCtx) {
+        this(rpcCtx, null);
+    }
+
+    public RpcRequestClosure(RpcContext rpcCtx, Message defaultResp) {
         super();
-        this.bizContext = bizContext;
-        this.asyncContext = asyncContext;
+        this.rpcCtx = rpcCtx;
+        this.defaultResp = defaultResp;
         this.respond = false;
     }
 
-    public BizContext getBizContext() {
-        return this.bizContext;
+    public RpcContext getRpcCtx() {
+        return rpcCtx;
     }
 
-    public AsyncContext getAsyncContext() {
-        return this.asyncContext;
-    }
-
-    public synchronized void sendResponse(Message msg) {
+    public synchronized void sendResponse(final Message msg) {
         if (this.respond) {
             return;
         }
-        this.asyncContext.sendResponse(msg);
+        this.rpcCtx.sendResponse(msg);
         this.respond = true;
     }
 
     @Override
-    public void run(Status status) {
-        sendResponse(RpcResponseFactory.newResponse(status));
+    public void run(final Status status) {
+        sendResponse(RpcFactoryHelper.responseFactory().newResponse(this.defaultResp, status));
     }
 }

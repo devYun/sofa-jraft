@@ -23,42 +23,47 @@ import com.alipay.sofa.jraft.entity.PeerId;
 import com.alipay.sofa.jraft.error.RaftError;
 import com.alipay.sofa.jraft.rpc.CliRequests.TransferLeaderRequest;
 import com.alipay.sofa.jraft.rpc.RpcRequestClosure;
-import com.alipay.sofa.jraft.rpc.RpcResponseFactory;
+import com.alipay.sofa.jraft.rpc.RpcRequests;
+import com.alipay.sofa.jraft.util.RpcFactoryHelper;
 import com.google.protobuf.Message;
 
 /**
  * Snapshot request processor.
  *
  * @author boyan (boyan@alibaba-inc.com)
- *
- * 2018-Apr-09 2:41:27 PM
+ * @author jiachun.fjc
  */
 public class TransferLeaderRequestProcessor extends BaseCliRequestProcessor<TransferLeaderRequest> {
 
     public TransferLeaderRequestProcessor(Executor executor) {
-        super(executor);
+        super(executor, RpcRequests.ErrorResponse.getDefaultInstance());
     }
 
     @Override
-    protected String getPeerId(TransferLeaderRequest request) {
+    protected String getPeerId(final TransferLeaderRequest request) {
         return request.getLeaderId();
     }
 
     @Override
-    protected String getGroupId(TransferLeaderRequest request) {
+    protected String getGroupId(final TransferLeaderRequest request) {
         return request.getGroupId();
     }
 
     @Override
-    protected Message processRequest0(CliRequestContext ctx, TransferLeaderRequest request, RpcRequestClosure done) {
-        PeerId peer = new PeerId();
+    protected Message processRequest0(final CliRequestContext ctx, final TransferLeaderRequest request,
+                                      final RpcRequestClosure done) {
+        final PeerId peer = new PeerId();
         if (request.hasPeerId() && !peer.parse(request.getPeerId())) {
-            return RpcResponseFactory.newResponse(RaftError.EINVAL, "Fail to parse peer id %s", request.getPeerId());
+            return RpcFactoryHelper //
+                .responseFactory() //
+                .newResponse(defaultResp(), RaftError.EINVAL, "Fail to parse peer id %s", request.getPeerId());
         }
-        LOG.info("Receive TransferLeaderRequest to {} from {} , newLeader will be {}", ctx.node.getNodeId(), done
-            .getBizContext().getRemoteAddress(), peer);
-        Status st = ctx.node.transferLeadershipTo(peer);
-        return RpcResponseFactory.newResponse(st);
+        LOG.info("Receive TransferLeaderRequest to {} from {}, newLeader will be {}.", ctx.node.getNodeId(), done
+            .getRpcCtx().getRemoteAddress(), peer);
+        final Status st = ctx.node.transferLeadershipTo(peer);
+        return RpcFactoryHelper //
+            .responseFactory() //
+            .newResponse(defaultResp(), st);
     }
 
     @Override

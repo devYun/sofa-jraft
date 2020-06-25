@@ -20,33 +20,34 @@ import java.util.concurrent.Executor;
 
 import com.alipay.sofa.jraft.rpc.CliRequests.SnapshotRequest;
 import com.alipay.sofa.jraft.rpc.RpcRequestClosure;
+import com.alipay.sofa.jraft.rpc.RpcRequests;
 import com.google.protobuf.Message;
 
 /**
  * Snapshot request processor.
  *
  * @author boyan (boyan@alibaba-inc.com)
- *
- * 2018-Apr-09 2:41:27 PM
+ * @author jiachun.fjc
  */
 public class SnapshotRequestProcessor extends BaseCliRequestProcessor<SnapshotRequest> {
 
     public SnapshotRequestProcessor(Executor executor) {
-        super(executor);
+        super(executor, RpcRequests.ErrorResponse.getDefaultInstance());
     }
 
     @Override
-    protected String getPeerId(SnapshotRequest request) {
+    protected String getPeerId(final SnapshotRequest request) {
         return request.getPeerId();
     }
 
     @Override
-    protected String getGroupId(SnapshotRequest request) {
+    protected String getGroupId(final SnapshotRequest request) {
         return request.getGroupId();
     }
 
     @Override
-    protected Message processRequest0(CliRequestContext ctx, SnapshotRequest request, RpcRequestClosure done) {
+    protected Message processRequest0(final CliRequestContext ctx, final SnapshotRequest request,
+                                      final RpcRequestClosure done) {
         LOG.info("Receive SnapshotRequest to {} from {}", ctx.node.getNodeId(), request.getPeerId());
         ctx.node.snapshot(done);
         return null;

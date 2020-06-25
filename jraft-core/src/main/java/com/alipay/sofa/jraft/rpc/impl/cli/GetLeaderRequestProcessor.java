@@ -28,67 +28,75 @@ import com.alipay.sofa.jraft.error.RaftError;
 import com.alipay.sofa.jraft.rpc.CliRequests.GetLeaderRequest;
 import com.alipay.sofa.jraft.rpc.CliRequests.GetLeaderResponse;
 import com.alipay.sofa.jraft.rpc.RpcRequestClosure;
-import com.alipay.sofa.jraft.rpc.RpcResponseFactory;
+import com.alipay.sofa.jraft.util.RpcFactoryHelper;
 import com.google.protobuf.Message;
 
 /**
  * Process get leader request.
  *
  * @author boyan (boyan@alibaba-inc.com)
- *
- * 2018-Apr-09 2:43:20 PM
+ * @author jiachun.fjc
  */
 public class GetLeaderRequestProcessor extends BaseCliRequestProcessor<GetLeaderRequest> {
 
     public GetLeaderRequestProcessor(Executor executor) {
-        super(executor);
+        super(executor, GetLeaderResponse.getDefaultInstance());
     }
 
     @Override
-    protected String getPeerId(GetLeaderRequest request) {
+    protected String getPeerId(final GetLeaderRequest request) {
         return request.getPeerId();
     }
 
     @Override
-    protected String getGroupId(GetLeaderRequest request) {
+    protected String getGroupId(final GetLeaderRequest request) {
         return request.getGroupId();
     }
 
     @Override
-    protected Message processRequest0(CliRequestContext ctx, GetLeaderRequest request, RpcRequestClosure done) {
-        //ignore
+    protected Message processRequest0(final CliRequestContext ctx, final GetLeaderRequest request,
+                                      final RpcRequestClosure done) {
+        // ignore
         return null;
     }
 
     @Override
-    public Message processRequest(GetLeaderRequest request, RpcRequestClosure done) {
+    public Message processRequest(final GetLeaderRequest request, final RpcRequestClosure done) {
         List<Node> nodes = new ArrayList<>();
-        String groupId = getGroupId(request);
+        final String groupId = getGroupId(request);
         if (request.hasPeerId()) {
-            String peerIdStr = getPeerId(request);
-            PeerId peer = new PeerId();
+            final String peerIdStr = getPeerId(request);
+            final PeerId peer = new PeerId();
             if (peer.parse(peerIdStr)) {
-                Status st = new Status();
+                final Status st = new Status();
                 nodes.add(getNode(groupId, peer, st));
                 if (!st.isOk()) {
-                    return RpcResponseFactory.newResponse(st);
+                    return RpcFactoryHelper //
+                        .responseFactory() //
+                        .newResponse(defaultResp(), st);
                 }
             } else {
-                return RpcResponseFactory.newResponse(RaftError.EINVAL, "Fail to parse peer id %", peerIdStr);
+                return RpcFactoryHelper //
+                    .responseFactory() //
+                    .newResponse(defaultResp(), RaftError.EINVAL, "Fail to parse peer id %s", peerIdStr);
             }
         } else {
             nodes = NodeManager.getInstance().getNodesByGroupId(groupId);
         }
         if (nodes == null || nodes.isEmpty()) {
-            return RpcResponseFactory.newResponse(RaftError.ENOENT, "No nodes in group %s", groupId);
+            return RpcFactoryHelper //
+                .responseFactory() //
+                .newResponse(defaultResp(), RaftError.ENOENT, "No nodes in group %s", groupId);
         }
-        for (Node node : nodes) {
-            PeerId leader = node.getLeaderId();
+        for (final Node node : nodes) {
+            final PeerId leader = node.getLeaderId();
             if (leader != null && !leader.isEmpty()) {
                 return GetLeaderResponse.newBuilder().setLeaderId(leader.toString()).build();
             }
         }
-        return RpcResponseFactory.newResponse(RaftError.EAGAIN, "Unknown leader");
+        return RpcFactoryHelper //
+            .responseFactory() //
+            .newResponse(defaultResp(), RaftError.EAGAIN, "Unknown leader");
     }
 
     @Override

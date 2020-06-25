@@ -20,6 +20,7 @@ import java.util.concurrent.Executor;
 
 import com.alipay.sofa.jraft.rpc.RaftServerService;
 import com.alipay.sofa.jraft.rpc.RpcRequestClosure;
+import com.alipay.sofa.jraft.rpc.RpcRequests;
 import com.alipay.sofa.jraft.rpc.RpcRequests.InstallSnapshotRequest;
 import com.google.protobuf.Message;
 
@@ -33,21 +34,22 @@ import com.google.protobuf.Message;
 public class InstallSnapshotRequestProcessor extends NodeRequestProcessor<InstallSnapshotRequest> {
 
     public InstallSnapshotRequestProcessor(Executor executor) {
-        super(executor);
+        super(executor, RpcRequests.InstallSnapshotResponse.getDefaultInstance());
     }
 
     @Override
-    protected String getPeerId(InstallSnapshotRequest request) {
+    protected String getPeerId(final InstallSnapshotRequest request) {
         return request.getPeerId();
     }
 
     @Override
-    protected String getGroupId(InstallSnapshotRequest request) {
+    protected String getGroupId(final InstallSnapshotRequest request) {
         return request.getGroupId();
     }
 
     @Override
-    public Message processRequest0(RaftServerService service, InstallSnapshotRequest request, RpcRequestClosure done) {
+    public Message processRequest0(final RaftServerService service, final InstallSnapshotRequest request,
+                                   final RpcRequestClosure done) {
         return service.handleInstallSnapshot(request, done);
     }
 

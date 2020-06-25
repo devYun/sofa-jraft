@@ -56,6 +56,7 @@ import com.alipay.sofa.jraft.util.DisruptorMetricSet;
 import com.alipay.sofa.jraft.util.LogExceptionHandler;
 import com.alipay.sofa.jraft.util.NamedThreadFactory;
 import com.alipay.sofa.jraft.util.Requires;
+import com.alipay.sofa.jraft.util.SegmentList;
 import com.alipay.sofa.jraft.util.ThreadHelper;
 import com.alipay.sofa.jraft.util.Utils;
 import com.lmax.disruptor.EventFactory;
@@ -90,8 +91,7 @@ public class LogManagerImpl implements LogManager {
     private long                                             nextWaitId;
     private LogId                                            diskId                 = new LogId(0, 0);
     private LogId                                            appliedId              = new LogId(0, 0);
-    // TODO  use a lock-free concurrent list instead?
-    private ArrayDeque<LogEntry>                             logsInMemory           = new ArrayDeque<>();
+    private final SegmentList<LogEntry>                      logsInMemory           = new SegmentList<>(true);
     private volatile long                                    firstLogIndex;
     private volatile long                                    lastLogIndex;
     private volatile LogId                                   lastSnapshotId         = new LogId(0, 0);
@@ -253,16 +253,7 @@ public class LogManagerImpl implements LogManager {
     private void clearMemoryLogs(final LogId id) {
         this.writeLock.lock();
         try {
-            int index = 0;
-            for (final int size = this.logsInMemory.size(); index < size; index++) {
-                final LogEntry entry = this.logsInMemory.get(index);
-                if (entry.getId().compareTo(id) > 0) {
-                    break;
-                }
-            }
-            if (index > 0) {
-                this.logsInMemory.removeRange(0, index);
-            }
+            this.logsInMemory.removeFromFirstWhen(entry -> entry.getId().compareTo(id) <= 0);
         } finally {
             this.writeLock.unlock();
         }
@@ -306,8 +297,8 @@ public class LogManagerImpl implements LogManager {
         this.writeLock.lock();
         try {
             if (!entries.isEmpty() && !checkAndResolveConflict(entries, done)) {
+                // If checkAndResolveConflict returns false, the done will be called in it.
                 entries.clear();
-                Utils.runClosureInThread(done, new Status(RaftError.EINTERNAL, "Fail to checkAndResolveConflict."));
                 return;
             }
             for (int i = 0; i < entries.size(); i++) {
@@ -468,14 +459,21 @@ public class LogManagerImpl implements LogManager {
                 this.lastId = appendToStorage(this.toAppend);
                 for (int i = 0; i < this.size; i++) {
                     this.storage.get(i).getEntries().clear();
-                    if (LogManagerImpl.this.hasError) {
-                        this.storage.get(i).run(new Status(RaftError.EIO, "Corrupted LogStorage"));
-                    } else {
-                        this.storage.get(i).run(Status.OK());
+                    Status st = null;
+                    try {
+                        if (LogManagerImpl.this.hasError) {
+                            st = new Status(RaftError.EIO, "Corrupted LogStorage");
+                        } else {
+                            st = Status.OK();
+                        }
+                        this.storage.get(i).run(st);
+                    } catch (Throwable t) {
+                        LOG.error("Fail to run closure with status: {}.", st, t);
                     }
                 }
                 this.toAppend.clear();
                 this.storage.clear();
+
             }
             this.size = 0;
             this.bufferSize = 0;
@@ -525,7 +523,7 @@ public class LogManagerImpl implements LogManager {
                         long startMs = Utils.monotonicMs();
                         try {
                             final TruncatePrefixClosure tpc = (TruncatePrefixClosure) done;
-                            LOG.debug("Truncating storage to firstIndexKept={}", tpc.firstIndexKept);
+                            LOG.debug("Truncating storage to firstIndexKept={}.", tpc.firstIndexKept);
                             ret = LogManagerImpl.this.logStorage.truncatePrefix(tpc.firstIndexKept);
                         } finally {
                             LogManagerImpl.this.nodeMetrics.recordLatency("truncate-log-prefix", Utils.monotonicMs()
@@ -536,7 +534,7 @@ public class LogManagerImpl implements LogManager {
                         startMs = Utils.monotonicMs();
                         try {
                             final TruncateSuffixClosure tsc = (TruncateSuffixClosure) done;
-                            LOG.warn("Truncating storage to lastIndexKept={}", tsc.lastIndexKept);
+                            LOG.warn("Truncating storage to lastIndexKept={}.", tsc.lastIndexKept);
                             ret = LogManagerImpl.this.logStorage.truncateSuffix(tsc.lastIndexKept);
                             if (ret) {
                                 this.lastId.setIndex(tsc.lastIndexKept);
@@ -550,7 +548,7 @@ public class LogManagerImpl implements LogManager {
                         break;
                     case RESET:
                         final ResetClosure rc = (ResetClosure) done;
-                        LOG.info("Reseting storage to nextLogIndex={}", rc.nextLogIndex);
+                        LOG.info("Resetting storage to nextLogIndex={}.", rc.nextLogIndex);
                         ret = LogManagerImpl.this.logStorage.reset(rc.nextLogIndex);
                         break;
                     default:
@@ -620,6 +618,9 @@ public class LogManagerImpl implements LogManager {
 
             if (this.lastSnapshotId.compareTo(this.appliedId) > 0) {
                 this.appliedId = this.lastSnapshotId.copy();
+            }
+            if (this.lastSnapshotId.compareTo(this.diskId) > 0) {
+                this.diskId = this.lastSnapshotId.copy();
             }
 
             if (term == 0) {
@@ -691,7 +692,8 @@ public class LogManagerImpl implements LogManager {
     private String descLogsInMemory() {
         final StringBuilder sb = new StringBuilder();
         boolean wasFirst = true;
-        for (final LogEntry logEntry : this.logsInMemory) {
+        for (int i = 0; i < this.logsInMemory.size(); i++) {
+            LogEntry logEntry = this.logsInMemory.get(i);
             if (!wasFirst) {
                 sb.append(",");
             } else {
@@ -926,20 +928,12 @@ public class LogManagerImpl implements LogManager {
     }
 
     private boolean truncatePrefix(final long firstIndexKept) {
-        int index = 0;
-        for (final int size = this.logsInMemory.size(); index < size; index++) {
-            final LogEntry entry = this.logsInMemory.get(index);
-            if (entry.getId().getIndex() >= firstIndexKept) {
-                break;
-            }
-        }
-        if (index > 0) {
-            this.logsInMemory.removeRange(0, index);
-        }
+
+        this.logsInMemory.removeFromFirstWhen(entry -> entry.getId().getIndex() < firstIndexKept);
 
         // TODO  maybe it's fine here
         Requires.requireTrue(firstIndexKept >= this.firstLogIndex,
-            "Try to truncate logs before %d, but the firstLogIndex is %d", firstIndexKept, this.firstLogIndex);
+                "Try to truncate logs before %d, but the firstLogIndex is %d", firstIndexKept, this.firstLogIndex);
 
         this.firstLogIndex = firstIndexKept;
         if (firstIndexKept > this.lastLogIndex) {
@@ -956,7 +950,7 @@ public class LogManagerImpl implements LogManager {
     private boolean reset(final long nextLogIndex) {
         this.writeLock.lock();
         try {
-            this.logsInMemory = new ArrayDeque<>();
+            this.logsInMemory.clear();
             this.firstLogIndex = nextLogIndex;
             this.lastLogIndex = nextLogIndex - 1;
             this.configManager.truncatePrefix(this.firstLogIndex);
@@ -975,14 +969,9 @@ public class LogManagerImpl implements LogManager {
                 lastIndexKept);
             return;
         }
-        while (!this.logsInMemory.isEmpty()) {
-            final LogEntry entry = this.logsInMemory.peekLast();
-            if (entry.getId().getIndex() > lastIndexKept) {
-                this.logsInMemory.pollLast();
-            } else {
-                break;
-            }
-        }
+
+        this.logsInMemory.removeFromLastWhen(entry -> entry.getId().getIndex() > lastIndexKept);
+
         this.lastLogIndex = lastIndexKept;
         final long lastTermKept = unsafeGetTerm(lastIndexKept);
         Requires.requireTrue(this.lastLogIndex == 0 || lastTermKept != 0);
@@ -1019,6 +1008,8 @@ public class LogManagerImpl implements LogManager {
                 LOG.warn(
                     "Received entries of which the lastLog={} is not greater than appliedIndex={}, return immediately with nothing changed.",
                     lastLogEntry.getId().getIndex(), appliedIndex);
+                // Replicate old logs before appliedIndex should be considered successfully, response OK.
+                Utils.runClosureInThread(done);
                 return false;
             }
             if (firstLogEntry.getId().getIndex() == this.lastLogIndex + 1) {

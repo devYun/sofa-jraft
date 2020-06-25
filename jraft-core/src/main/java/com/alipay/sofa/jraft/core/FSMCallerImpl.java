@@ -233,7 +233,7 @@ public class FSMCallerImpl implements FSMCaller {
             return false;
         }
         if (!this.taskQueue.tryPublishEvent(tpl)) {
-            onError(new RaftException(ErrorType.ERROR_TYPE_STATE_MACHINE, new Status(RaftError.EBUSY,
+            setError(new RaftException(ErrorType.ERROR_TYPE_STATE_MACHINE, new Status(RaftError.EBUSY,
                 "FSMCaller is overload.")));
             return false;
         }
@@ -515,10 +515,10 @@ public class FSMCallerImpl implements FSMCaller {
             final long lastIndex = iterImpl.getIndex() - 1;
             final long lastTerm = this.logManager.getTerm(lastIndex);
             final LogId lastAppliedId = new LogId(lastIndex, lastTerm);
-            this.lastAppliedIndex.set(committedIndex);
+            this.lastAppliedIndex.set(lastIndex);
             this.lastAppliedTerm = lastTerm;
             this.logManager.setAppliedId(lastAppliedId);
-            notifyLastAppliedIndexUpdated(committedIndex);
+            notifyLastAppliedIndexUpdated(lastIndex);
         } finally {
             this.nodeMetrics.recordLatency("fsm-commit", Utils.monotonicMs() - startMs);
         }

@@ -44,8 +44,8 @@ public abstract class RepeatedTimer implements Describer {
     private Timeout            timeout;
     private boolean            stopped;
     private volatile boolean   running;
-    private boolean            destroyed;
-    private boolean            invoking;
+    private volatile boolean   destroyed;
+    private volatile boolean   invoking;
     private volatile int       timeoutMs;
     private final String       name;
 
@@ -53,11 +53,11 @@ public abstract class RepeatedTimer implements Describer {
         return this.timeoutMs;
     }
 
-    public RepeatedTimer(String name, int timeoutMs) {
+    public RepeatedTimer(final String name, final int timeoutMs) {
         this(name, timeoutMs, new HashedWheelTimer(new NamedThreadFactory(name, true), 1, TimeUnit.MILLISECONDS, 2048));
     }
 
-    public RepeatedTimer(String name, int timeoutMs, Timer timer) {
+    public RepeatedTimer(final String name, final int timeoutMs, final Timer timer) {
         super();
         this.name = name;
         this.timeoutMs = timeoutMs;
@@ -81,12 +81,7 @@ public abstract class RepeatedTimer implements Describer {
     }
 
     public void run() {
-        this.lock.lock();
-        try {
-            this.invoking = true;
-        } finally {
-            this.lock.unlock();
-        }
+        this.invoking = true;
         try {
             onTrigger();
         } catch (final Throwable t) {
@@ -156,8 +151,30 @@ public abstract class RepeatedTimer implements Describer {
         }
     }
 
+    /**
+     * Restart the timer.
+     * It will be started if it's stopped, and it will be restarted if it's running.
+     *
+     * @author Qing Wang (kingchin1218@gmail.com)
+     *
+     * 2020-Mar-26 20:38:37 PM
+     */
+    public void restart() {
+        this.lock.lock();
+        try {
+            if (this.destroyed) {
+                return;
+            }
+            this.stopped = false;
+            this.running = true;
+            schedule();
+        } finally {
+            this.lock.unlock();
+        }
+    }
+
     private void schedule() {
-        if(this.timeout != null) {
+        if (this.timeout != null) {
             this.timeout.cancel();
         }
         final TimerTask timerTask = timeout -> {
@@ -216,8 +233,6 @@ public abstract class RepeatedTimer implements Describer {
             if (!this.running) {
                 invokeDestroyed = true;
             }
-            // Timer#stop is idempotent
-            this.timer.stop();
             if (this.stopped) {
                 return;
             }
@@ -231,6 +246,7 @@ public abstract class RepeatedTimer implements Describer {
             }
         } finally {
             this.lock.unlock();
+            this.timer.stop();
             if (invokeDestroyed) {
                 onDestroy();
             }
@@ -272,8 +288,8 @@ public abstract class RepeatedTimer implements Describer {
 
     @Override
     public String toString() {
-        return "RepeatedTimer{" + "timeout=" + timeout + ", stopped=" + stopped + ", running=" + running
-               + ", destroyed=" + destroyed + ", invoking=" + invoking + ", timeoutMs=" + timeoutMs + ", name='" + name
-               + '\'' + '}';
+        return "RepeatedTimer{" + "timeout=" + this.timeout + ", stopped=" + this.stopped + ", running=" + this.running
+               + ", destroyed=" + this.destroyed + ", invoking=" + this.invoking + ", timeoutMs=" + this.timeoutMs
+               + ", name='" + this.name + '\'' + '}';
     }
 }

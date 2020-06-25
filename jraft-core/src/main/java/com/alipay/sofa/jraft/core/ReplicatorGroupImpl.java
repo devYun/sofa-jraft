@@ -110,7 +110,7 @@ public class ReplicatorGroupImpl implements ReplicatorGroup {
 
     @Override
     public boolean addReplicator(final PeerId peer) {
-        return this.addReplicator(peer, ReplicatorType.Follower);
+        return addReplicator(peer, ReplicatorType.Follower);
     }
 
     @Override
@@ -126,7 +126,7 @@ public class ReplicatorGroupImpl implements ReplicatorGroup {
         opts.setPeerId(peer);
         final ThreadId rid = Replicator.start(opts, this.raftOptions);
         if (rid == null) {
-            LOG.error("Fail to start replicator to peer={}.", peer);
+            LOG.error("Fail to start replicator to peer={}, replicatorType={}.", peer, replicatorType);
             this.failureReplicators.put(peer, replicatorType);
             return false;
         }

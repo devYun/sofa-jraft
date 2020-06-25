@@ -36,12 +36,9 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.alipay.remoting.rpc.RpcConfigManager;
-import com.alipay.remoting.rpc.RpcConfigs;
 import com.alipay.sofa.jraft.Closure;
 import com.alipay.sofa.jraft.Status;
 import com.alipay.sofa.jraft.error.RaftError;
-import com.alipay.sofa.jraft.rpc.RaftRpcServerFactory;
 import com.codahale.metrics.MetricRegistry;
 
 /**
@@ -51,7 +48,7 @@ import com.codahale.metrics.MetricRegistry;
  *
  * 2018-Apr-07 10:12:35 AM
  */
-public class Utils {
+public final class Utils {
 
     private static final Logger       LOG                                 = LoggerFactory.getLogger(Utils.class);
 
@@ -310,18 +307,6 @@ public class Utils {
         return s.getBytes(StandardCharsets.UTF_8);
     }
 
-    /**
-     * Ensure bolt RPC framework supports pipeline, enable `bolt.rpc.dispatch-msg-list-in-default-executor`
-     * system property.
-     */
-    public static void ensureBoltPipeline() {
-        if (RpcConfigManager.dispatch_msg_list_in_default_executor()) {
-            System.setProperty(RpcConfigs.DISPATCH_MSG_LIST_IN_DEFAULT_EXECUTOR, "false");
-            RaftRpcServerFactory.LOG.warn("JRaft SET {} to be false for replicator pipeline optimistic.",
-                RpcConfigs.DISPATCH_MSG_LIST_IN_DEFAULT_EXECUTOR);
-        }
-    }
-
     public static <T> T withLockObject(final T obj) {
         return Requires.requireNonNull(obj, "obj");
     }
@@ -366,5 +351,9 @@ public class Utils {
                 throw e1;
             }
         }
+    }
+
+    public static String getString(final byte[] bs, final int off, final int len) {
+        return new String(bs, off, len, StandardCharsets.UTF_8);
     }
 }

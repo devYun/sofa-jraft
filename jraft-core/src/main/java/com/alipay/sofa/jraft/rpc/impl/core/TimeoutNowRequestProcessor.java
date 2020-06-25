@@ -20,6 +20,7 @@ import java.util.concurrent.Executor;
 
 import com.alipay.sofa.jraft.rpc.RaftServerService;
 import com.alipay.sofa.jraft.rpc.RpcRequestClosure;
+import com.alipay.sofa.jraft.rpc.RpcRequests;
 import com.alipay.sofa.jraft.rpc.RpcRequests.TimeoutNowRequest;
 import com.google.protobuf.Message;
 
@@ -27,27 +28,27 @@ import com.google.protobuf.Message;
  * TimeoutNow request processor.
  *
  * @author boyan (boyan@alibaba-inc.com)
- *
- * 2018-Apr-23 11:12:48 AM
+ * @author jiachun.fjc
  */
 public class TimeoutNowRequestProcessor extends NodeRequestProcessor<TimeoutNowRequest> {
 
     public TimeoutNowRequestProcessor(Executor executor) {
-        super(executor);
+        super(executor, RpcRequests.TimeoutNowResponse.getDefaultInstance());
     }
 
     @Override
-    protected String getPeerId(TimeoutNowRequest request) {
+    protected String getPeerId(final TimeoutNowRequest request) {
         return request.getPeerId();
     }
 
     @Override
-    protected String getGroupId(TimeoutNowRequest request) {
+    protected String getGroupId(final TimeoutNowRequest request) {
         return request.getGroupId();
     }
 
     @Override
-    public Message processRequest0(RaftServerService service, TimeoutNowRequest request, RpcRequestClosure done) {
+    public Message processRequest0(final RaftServerService service, final TimeoutNowRequest request,
+                                   final RpcRequestClosure done) {
         return service.handleTimeoutNowRequest(request, done);
     }
 

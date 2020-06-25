@@ -25,8 +25,6 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.alipay.remoting.AsyncContext;
-import com.alipay.remoting.rpc.RpcServer;
 import com.alipay.sofa.jraft.Node;
 import com.alipay.sofa.jraft.RaftGroupService;
 import com.alipay.sofa.jraft.Status;
@@ -35,6 +33,8 @@ import com.alipay.sofa.jraft.conf.Configuration;
 import com.alipay.sofa.jraft.entity.PeerId;
 import com.alipay.sofa.jraft.option.NodeOptions;
 import com.alipay.sofa.jraft.option.ReadOnlyOption;
+import com.alipay.sofa.jraft.rpc.RpcContext;
+import com.alipay.sofa.jraft.rpc.RpcServer;
 import com.alipay.sofa.jraft.test.atomic.KeyNotFoundException;
 import com.alipay.sofa.jraft.test.atomic.command.BooleanCommand;
 import com.alipay.sofa.jraft.test.atomic.command.ValueCommand;
@@ -70,29 +70,31 @@ public class AtomicRangeGroup {
 
     public AtomicRangeGroup(String dataPath, String groupId, PeerId serverId, long minSlot, long maxSlot,
                             NodeOptions nodeOptions, RpcServer rpcServer) throws IOException {
-        //初始化路径
+        // Init file path
         FileUtils.forceMkdir(new File(dataPath));
         this.minSlot = minSlot;
         this.maxSlot = maxSlot;
 
-        //初始化状态机
+        // Init statemachine
         this.fsm = new AtomicStateMachine();
-        //设置状态机到启动参数
+
+        // Set statemachine to bootstrap options
         nodeOptions.setFsm(this.fsm);
         nodeOptions.setEnableMetrics(true);
         nodeOptions.getRaftOptions().setReplicatorPipeline(true);
         nodeOptions.getRaftOptions().setSync(true);
         nodeOptions.getRaftOptions().setReadOnlyOptions(ReadOnlyOption.ReadOnlySafe);
-        //设置存储路径
-        //日志,必须
+
+        // Set the data path
+        // Log, required
         nodeOptions.setLogUri(dataPath + File.separator + "log");
-        //元信息,必须
+        // Metadata, required
         nodeOptions.setRaftMetaUri(dataPath + File.separator + "raft_meta");
-        //snapshot,可选,一般都推荐.
+        // Snapshot, not required, but recommend
         nodeOptions.setSnapshotUri(dataPath + File.separator + "snapshot");
-        //初始化 raft group 服务框架
+        // Init raft group service framework
         this.raftGroupService = new RaftGroupService(groupId, serverId, nodeOptions, rpcServer);
-        //启动
+        // Startup node
         this.node = this.raftGroupService.start();
 
         final ConsoleReporter reporter = ConsoleReporter.forRegistry(node.getNodeMetrics().getMetricRegistry())
@@ -101,7 +103,7 @@ public class AtomicRangeGroup {
 
     }
 
-    public void readFromQuorum(final String key, AsyncContext asyncContext) {
+    public void readFromQuorum(final String key, RpcContext asyncContext) {
         final byte[] reqContext = new byte[4];
         Bits.putInt(reqContext, 0, requestId.incrementAndGet());
         this.node.readIndex(reqContext, new ReadIndexClosure() {
@@ -154,14 +156,13 @@ public class AtomicRangeGroup {
     public static AtomicRangeGroup start(StartupConf conf, RpcServer rpcServer) throws IOException {
 
         final NodeOptions nodeOptions = new NodeOptions();
-        //为了测试,调整 snapshot 间隔等参数
-        //设置选举超时时间为 1 秒
+        // Set election timeout to 1 second
         nodeOptions.setElectionTimeoutMs(1000);
-        //关闭 CLI 服务。
+        // Close cli service
         nodeOptions.setDisableCli(false);
-        //每隔30秒做一次 snapshot
+        // A snapshot saving would be triggered every 30 seconds
         // nodeOptions.setSnapshotIntervalSecs(30);
-        //解析参数
+        // Parsing Options
         final PeerId serverId = new PeerId();
         if (!serverId.parse(conf.getServerAddress())) {
             throw new IllegalArgumentException("Fail to parse serverId:" + conf.getServerAddress());
@@ -170,9 +171,9 @@ public class AtomicRangeGroup {
         if (!initConf.parse(conf.getConf())) {
             throw new IllegalArgumentException("Fail to parse initConf:" + conf.getConf());
         }
-        //设置初始集群配置
+        // Set the initial cluster configuration
         nodeOptions.setInitialConf(initConf);
-        //启动
+        // Startup node
         final AtomicRangeGroup node = new AtomicRangeGroup(conf.getDataPath(), conf.getGroupId(), serverId,
             conf.getMinSlot(), conf.getMaxSlot(), nodeOptions, rpcServer);
         LOG.info("Started range node[{}-{}] at port:{}", conf.getMinSlot(), conf.getMaxSlot(), node.getNode()
